@@ -25,6 +25,10 @@
       position: absolute;
       top: 0;
       left: 0;
+      cursor: grab;
+    }
+    #game-container:active {
+      cursor: grabbing;
     }
 
     /* HUD Top */
@@ -41,14 +45,14 @@
     }
     .hud-box {
       background: rgba(14, 20, 48, 0.88);
-      border: 1px solid rgba(242, 193, 78, 0.35);
+      border: 1px solid rgba(242, 193, 78, 0.4);
       border-radius: 12px;
       padding: 10px 18px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
     }
     #flames-box {
-      font-size: 22px;
+      font-size: 24px;
       letter-spacing: 4px;
     }
     #timer-box {
@@ -74,7 +78,7 @@
     /* Bottom HUD: 10-slot mote bar & Cooldown icons */
     #hud-bottom {
       position: absolute;
-      bottom: 24px;
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
@@ -87,79 +91,93 @@
     #mote-bar {
       display: flex;
       gap: 6px;
-      background: rgba(14, 20, 48, 0.85);
-      border: 1px solid rgba(242, 193, 78, 0.3);
+      background: rgba(14, 20, 48, 0.88);
+      border: 1px solid rgba(242, 193, 78, 0.4);
       border-radius: 20px;
       padding: 8px 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
     .mote-slot {
-      width: 14px;
-      height: 22px;
+      width: 15px;
+      height: 24px;
       border-radius: 6px;
       border: 1px solid #5b5f6e;
       background: #1b2350;
-      transition: all 0.2s ease;
+      transition: all 0.25s ease;
     }
     .mote-slot.filled {
       background: #fff6c2;
       border-color: #f2c14e;
-      box-shadow: 0 0 10px #ffe58a;
+      box-shadow: 0 0 12px #ffe58a;
+      transform: scaleY(1.08);
     }
 
     /* Cooldown indicators */
     #cooldowns {
       position: absolute;
-      bottom: 24px;
-      right: 24px;
+      bottom: 20px;
+      right: 20px;
       display: flex;
       gap: 12px;
       pointer-events: none;
       z-index: 10;
     }
     .cd-badge {
-      background: rgba(14, 20, 48, 0.85);
+      background: rgba(14, 20, 48, 0.88);
       border: 1px solid #f2c14e;
       border-radius: 12px;
       padding: 8px 14px;
       text-align: center;
       font-size: 12px;
+      backdrop-filter: blur(8px);
     }
     .cd-badge.ready {
       border-color: #55ff88;
-      box-shadow: 0 0 8px rgba(85, 255, 136, 0.4);
+      box-shadow: 0 0 10px rgba(85, 255, 136, 0.4);
     }
 
     /* Interact Prompt */
     #interact-prompt {
       position: absolute;
-      bottom: 80px;
+      bottom: 90px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(242, 193, 78, 0.9);
+      background: rgba(242, 193, 78, 0.95);
       color: #120a1a;
       font-weight: bold;
-      padding: 6px 16px;
-      border-radius: 16px;
+      padding: 8px 20px;
+      border-radius: 20px;
       font-size: 14px;
       display: none;
       pointer-events: none;
       z-index: 10;
+      box-shadow: 0 4px 20px rgba(242, 193, 78, 0.4);
+      animation: pulse-btn 1.2s infinite alternate;
+    }
+    @keyframes pulse-btn {
+      from { transform: translateX(-50%) scale(1); }
+      to { transform: translateX(-50%) scale(1.05); }
     }
 
-    /* Off-screen Lantern Arrow */
+    /* Floating Off-Screen Navigation Arrow */
+    #nav-arrow-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9;
+    }
     #nav-arrow {
       position: absolute;
-      top: 50%;
-      left: 50%;
       width: 0;
       height: 0;
-      border-left: 10px solid transparent;
-      border-right: 10px solid transparent;
-      border-bottom: 20px solid #f2c14e;
-      pointer-events: none;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-bottom: 24px solid #f2c14e;
       display: none;
-      z-index: 10;
-      transform-origin: center 20px;
+      filter: drop-shadow(0 0 8px rgba(242, 193, 78, 0.8));
     }
 
     /* Overlay Modal (Pause, Story Intro, Night Won, Game Over) */
@@ -169,8 +187,8 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(10, 14, 34, 0.9);
-      backdrop-filter: blur(8px);
+      background: rgba(10, 14, 34, 0.92);
+      backdrop-filter: blur(10px);
       display: none;
       justify-content: center;
       align-items: center;
@@ -179,11 +197,12 @@
     .modal-card {
       background: #141b3d;
       border: 2px solid #f2c14e;
-      border-radius: 16px;
-      padding: 32px 40px;
+      border-radius: 18px;
+      padding: 32px 42px;
       text-align: center;
-      max-width: 480px;
-      box-shadow: 0 0 35px rgba(242, 193, 78, 0.3);
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 0 40px rgba(242, 193, 78, 0.35);
     }
     .modal-card h2 {
       font-size: 28px;
@@ -193,7 +212,7 @@
     .modal-card p {
       font-size: 15px;
       line-height: 1.6;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
       color: #e8e2d0;
     }
     .modal-actions {
@@ -214,7 +233,7 @@
     }
     .btn:hover {
       transform: scale(1.04);
-      box-shadow: 0 4px 15px rgba(242, 193, 78, 0.5);
+      box-shadow: 0 4px 18px rgba(242, 193, 78, 0.6);
     }
     .btn.secondary {
       background: rgba(255, 255, 255, 0.1);
@@ -224,11 +243,43 @@
     .btn.secondary:hover {
       background: rgba(255, 255, 255, 0.2);
     }
+
+    /* Settings Group */
+    .settings-group {
+      text-align: left;
+      background: rgba(20, 27, 61, 0.7);
+      border: 1px solid #5b5f6e;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+    .settings-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .settings-row:last-child {
+      margin-bottom: 0;
+    }
+    .settings-row label {
+      font-size: 14px;
+      color: #f2c14e;
+    }
+    .settings-row input[type=range] {
+      width: 150px;
+      cursor: pointer;
+    }
   </style>
   <script src="src/render/three.min.js"></script>
 </head>
 <body>
   <div id="game-container"></div>
+
+  <!-- Off-Screen Navigation Arrow -->
+  <div id="nav-arrow-container">
+    <div id="nav-arrow"></div>
+  </div>
 
   <!-- HUD Top -->
   <div id="hud-top">
@@ -250,10 +301,7 @@
   <!-- Interact Prompt -->
   <div id="interact-prompt">E — Nạp ánh sáng (x/10)</div>
 
-  <!-- Off-screen indicator -->
-  <div id="nav-arrow"></div>
-
-  <!-- HUD Bottom (10 Mote Slots) -->
+  <!-- HUD Bottom (10 Mote Slots & Controls Helper) -->
   <div id="hud-bottom">
     <div id="mote-bar">
       <div class="mote-slot"></div><div class="mote-slot"></div>
@@ -262,7 +310,9 @@
       <div class="mote-slot"></div><div class="mote-slot"></div>
       <div class="mote-slot"></div><div class="mote-slot"></div>
     </div>
-    <div style="font-size: 12px; color: #8fa3b8;">WASD: Di chuyển | Shift: Lướt | Space: Nhảy | Q: Tỏa Sáng | E: Nạp Đèn</div>
+    <div style="font-size: 12px; color: #8fa3b8; text-shadow: 0 1px 4px #000;">
+      WASD: Di chuyển | Kéo chuột: Xoay Camera 3D | Shift: Lướt | Space: Nhảy | Q: Tỏa Sáng | E: Nạp Đèn
+    </div>
   </div>
 
   <!-- Cooldowns -->
@@ -275,9 +325,21 @@
   <div class="modal-overlay" id="modal-pause">
     <div class="modal-card">
       <h2>Tạm Dừng Trò Chơi</h2>
-      <p>Hành trình của Mây đang tạm nghỉ trong sương đêm.</p>
+      <p>Hành trình thắp sáng của Mây đang tạm nghỉ trong sương đêm.</p>
+
+      <div class="settings-group">
+        <div class="settings-row">
+          <label for="vol-slider">Âm lượng:</label>
+          <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.8">
+        </div>
+        <div class="settings-row">
+          <label for="sens-slider">Độ nhạy chuột:</label>
+          <input type="range" id="sens-slider" min="0.3" max="2.5" step="0.1" value="1.0">
+        </div>
+      </div>
+
       <div class="modal-actions">
-        <button class="btn" id="btn-resume">Tiếp Tục Chơi</button>
+        <button class="btn" id="btn-resume">Tiếp Tục Chơi (Esc / P)</button>
         <button class="btn secondary" id="btn-restart-night">Chơi Lại Đêm Này</button>
       </div>
     </div>
@@ -297,7 +359,7 @@
     <div class="modal-card">
       <h2 id="result-title">Hoàn Thành Đêm!</h2>
       <p id="result-desc">Tất cả ngọn đèn đã thắp sáng rực rỡ.</p>
-      <div id="result-score" style="font-size: 22px; color: #f2c14e; font-weight: bold; margin-bottom: 20px;">Điểm: 0</div>
+      <div id="result-score" style="font-size: 24px; color: #f2c14e; font-weight: bold; margin-bottom: 20px;">Điểm: 0</div>
       <button class="btn" id="btn-next-night">Đêm Tiếp Theo</button>
     </div>
   </div>
@@ -324,10 +386,13 @@
     const cdPulse = document.getElementById('cd-pulse');
     const cdPulseVal = document.getElementById('cd-pulse-val');
     const elPrompt = document.getElementById('interact-prompt');
+    const navArrow = document.getElementById('nav-arrow');
 
     const modalPause = document.getElementById('modal-pause');
     const btnResume = document.getElementById('btn-resume');
     const btnRestartNight = document.getElementById('btn-restart-night');
+    const volSlider = document.getElementById('vol-slider');
+    const sensSlider = document.getElementById('sens-slider');
 
     const modalIntro = document.getElementById('modal-intro');
     const introTitle = document.getElementById('intro-title');
@@ -339,6 +404,22 @@
     const resultDesc = document.getElementById('result-desc');
     const resultScore = document.getElementById('result-score');
     const btnNextNight = document.getElementById('btn-next-night');
+
+    // Init slider values from storage
+    if (localStorage.getItem('dao_den_long_vol')) {
+      volSlider.value = localStorage.getItem('dao_den_long_vol');
+    }
+    if (localStorage.getItem('dao_den_long_sens')) {
+      sensSlider.value = localStorage.getItem('dao_den_long_sens');
+    }
+
+    volSlider.addEventListener('input', e => {
+      game.setVolume(parseFloat(e.target.value));
+    });
+
+    sensSlider.addEventListener('input', e => {
+      game.setSensitivity(parseFloat(e.target.value));
+    });
 
     const nightStories = {
       1: { name: "Đêm 1 — Đảo Bến", text: '"Mây con, hãy thu thập những đốm sáng đom đóm trong đêm sương và thắp lại 5 Đèn Lồng Lớn trên Đảo Bến. Cẩn thận với Bóng Mực!" — Lời Ông Đăng' },
@@ -446,22 +527,66 @@
         cdPulseVal.innerText = `${pulseCd.toFixed(1)}s`;
       }
 
-      // Proximity check for interact prompt
+      // Proximity check for interact prompt and nearest unlit lantern
       let nearLantern = null;
+      let nearestUnlit = null;
+      let minDistUnlit = Infinity;
+
       for (const l of eng.lanterns) {
         if (!l.lit) {
           const d = Math.hypot(eng.player.pos[0] - l.pos[0], eng.player.pos[2] - l.pos[2]);
-          if (d <= eng.tuning.interact_radius) {
+          if (d <= eng.tuning.interact_radius && !nearLantern) {
             nearLantern = l;
-            break;
+          }
+          if (d < minDistUnlit) {
+            minDistUnlit = d;
+            nearestUnlit = l;
           }
         }
       }
+
       if (nearLantern) {
         elPrompt.innerText = `E — Nạp ánh sáng (${nearLantern.deposited}/${eng.tuning.lantern_cost})`;
         elPrompt.style.display = 'block';
       } else {
         elPrompt.style.display = 'none';
+      }
+
+      // Off-screen indicator arrow pointing to nearest unlit lantern
+      if (nearestUnlit && minDistUnlit > 6.0 && game.camera) {
+        // Project lantern pos to 2D screen coords
+        const pos3D = new THREE.Vector3(nearestUnlit.pos[0], nearestUnlit.pos[1] + 2.5, nearestUnlit.pos[2]);
+        pos3D.project(game.camera);
+
+        const isBehind = pos3D.z > 1.0;
+        const screenX = (pos3D.x * 0.5 + 0.5) * window.innerWidth;
+        const screenY = (-(pos3D.y * 0.5) + 0.5) * window.innerHeight;
+
+        const isOffScreen = screenX < 40 || screenX > window.innerWidth - 40 || screenY < 40 || screenY > window.innerHeight - 40 || isBehind;
+
+        if (isOffScreen) {
+          navArrow.style.display = 'block';
+          const centerX = window.innerWidth / 2;
+          const centerY = window.innerHeight / 2;
+          let dirX = screenX - centerX;
+          let dirY = screenY - centerY;
+          if (isBehind) {
+            dirX = -dirX;
+            dirY = -dirY;
+          }
+          const angle = Math.atan2(dirY, dirX);
+          const margin = 50;
+          const clampX = Math.max(margin, Math.min(window.innerWidth - margin, centerX + Math.cos(angle) * (centerX - margin)));
+          const clampY = Math.max(margin, Math.min(window.innerHeight - margin, centerY + Math.sin(angle) * (centerY - margin)));
+
+          navArrow.style.left = `${clampX - 12}px`;
+          navArrow.style.top = `${clampY - 12}px`;
+          navArrow.style.transform = `rotate(${angle + Math.PI / 2}rad)`;
+        } else {
+          navArrow.style.display = 'none';
+        }
+      } else {
+        navArrow.style.display = 'none';
       }
 
       // Pause Modal sync

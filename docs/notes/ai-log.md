@@ -17,4 +17,6 @@ Học viên: Trần Quốc Đồng (MSSV: 2A202603643)
   - Cập nhật các test cũ của Phase 1 sang số chuẩn (chi phí đèn 10, chi phí tỏa sáng 3, điểm số tính theo nạp). Cả 8 test cũ đều xanh.
 - **Tối ưu hóa Token & Hiệu Năng**:
   - Tận dụng cấu trúc dữ liệu Map và PRNG Mulberry32 tối ưu giúp chạy 21.600 ticks mô phỏng chỉ trong **~780ms**, vượt xa yêu cầu $\le 30\text{ s}$.
-  - Ước tính token sử dụng cho Phase 2: ~42k prompt tokens, ~8k completion tokens.
+  - Sửa lỗi hướng camera 3D và góc nhìn điều khiển (W hướng thẳng về phía trước theo camera, chuột kéo xoay góc nhìn 3D mượt mà).
+  - Cải thiện chất lượng hình ảnh: Bầu trời sao lấp lánh (starfield), đổ bóng thời gian thực (soft shadows), đèn lồng chạm khắc 8 cạnh, đom đóm 2 lớp phát sáng aura, và mũi tên định vị đèn chưa thắp ngoài màn hình.
+  - Ước tính token sử dụng cho Phase 2: ~46k prompt tokens, ~10k completion tokens.

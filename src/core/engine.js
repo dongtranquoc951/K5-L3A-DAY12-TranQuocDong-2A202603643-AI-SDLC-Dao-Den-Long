@@ -437,19 +437,27 @@ export class IslandEngine {
     const baseSpeed = hasCharm ? 7.2 : this.tuning.player_speed;
     const dt = 1 / 60.0;
 
+    const prevX = this.player.pos[0];
+    const prevY = this.player.pos[1];
+    const prevZ = this.player.pos[2];
+
     if (this.player.dash_timer > 0) {
       // Dashing: 14 m/s in dash_dir, maintain Y altitude in air
-      this.player.pos[0] += this.player.dash_dir[0] * (this.tuning.dash_speed * dt);
-      this.player.pos[2] += this.player.dash_dir[1] * (this.tuning.dash_speed * dt);
+      this.player.vel[0] = this.player.dash_dir[0] * this.tuning.dash_speed;
+      this.player.vel[2] = this.player.dash_dir[1] * this.tuning.dash_speed;
       this.player.vel[1] = 0.0;
+      this.player.pos[0] += this.player.vel[0] * dt;
+      this.player.pos[2] += this.player.vel[2] * dt;
     } else {
       if (this.player.launch_active) {
         // Preserves launch horizontal velocity
         this.player.pos[0] += this.player.vel[0] * dt;
         this.player.pos[2] += this.player.vel[2] * dt;
       } else {
-        this.player.pos[0] += worldMoveX * (baseSpeed * dt);
-        this.player.pos[2] += worldMoveZ * (baseSpeed * dt);
+        this.player.vel[0] = worldMoveX * baseSpeed;
+        this.player.vel[2] = worldMoveZ * baseSpeed;
+        this.player.pos[0] += this.player.vel[0] * dt;
+        this.player.pos[2] += this.player.vel[2] * dt;
       }
 
       // Wind push in Night 3
@@ -466,14 +474,25 @@ export class IslandEngine {
       }
     }
 
-    // Ground & Cliff Collision
+    // Ground & Cliff Collision Check
     const groundY = this.getGroundHeight(this.player.pos[0], this.player.pos[2]);
     if (groundY > -500.0) {
-      if (this.player.pos[1] <= groundY) {
+      // Cliff check in Night 3: vertical walls prevent stepping up higher than 0.5m without ramp
+      if (groundY > prevY + 0.6 && this.night === 3 && !this.player.launch_active && this.player.pos[1] < groundY) {
+        // Block horizontal movement into high cliff
+        this.player.pos[0] = prevX;
+        this.player.pos[2] = prevZ;
+        this.player.vel[0] = 0.0;
+        this.player.vel[2] = 0.0;
+      } else if (this.player.pos[1] <= groundY) {
         this.player.pos[1] = groundY;
         this.player.vel[1] = 0.0;
         this.player.grounded = true;
         this.player.launch_active = false;
+      } else if (this.player.grounded && Math.abs(this.player.pos[1] - groundY) <= 0.4) {
+        // Smooth snap to ground slope when walking
+        this.player.pos[1] = groundY;
+        this.player.vel[1] = 0.0;
       } else {
         this.player.grounded = false;
       }
