@@ -4,18 +4,19 @@ import fs from 'node:fs';
 import { runHeadless } from '../src/headless.js';
 
 test('Win Condition: Lighting all 5 lanterns triggers game_over won all_lit', () => {
+  // Ticket-02 requires 10 motes per lantern
   const scenario = {
-    player: { pos: [0, 0, 1.0], carried: 3, flames: 3 },
+    player: { pos: [0, 0, 1.0], carried: 10, flames: 3 },
     random_motes: false,
     random_shades: false,
     motes: [],
     shades: [],
     lanterns: [
       { id: "L1", pos: [0, 0, 2.0], deposited: 0, lit: false },
-      { id: "L2", pos: [10, 0, 10], deposited: 3, lit: true },
-      { id: "L3", pos: [10, 0, -10], deposited: 3, lit: true },
-      { id: "L4", pos: [-10, 0, -10], deposited: 3, lit: true },
-      { id: "L5", pos: [-10, 0, 10], deposited: 3, lit: true }
+      { id: "L2", pos: [10, 0, 10], deposited: 10, lit: true },
+      { id: "L3", pos: [10, 0, -10], deposited: 10, lit: true },
+      { id: "L4", pos: [-10, 0, -10], deposited: 10, lit: true },
+      { id: "L5", pos: [-10, 0, 10], deposited: 10, lit: true }
     ],
     time_left_s: 100
   };

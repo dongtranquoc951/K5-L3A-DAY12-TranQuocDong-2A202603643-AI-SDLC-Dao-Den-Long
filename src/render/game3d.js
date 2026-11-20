@@ -4,36 +4,32 @@ import { SoundFX } from './audio.js';
 /* global THREE */
 
 export class Game3D {
-  constructor(container) {
+  constructor(container, night = 1) {
     this.container = container;
+    this.night = night;
     this.sound = new SoundFX();
-    this.engine = new IslandEngine({ seed: Math.floor(Math.random() * 10000) });
+    this.engine = new IslandEngine({
+      seed: Math.floor(Math.random() * 10000),
+      night: this.night
+    });
 
     this.keys = {
-      KeyW: false,
-      KeyS: false,
-      KeyA: false,
-      KeyD: false,
-      ArrowUp: false,
-      ArrowDown: false,
-      ArrowLeft: false,
-      ArrowRight: false,
-      Space: false,
-      KeyE: false,
-      KeyQ: false,
-      KeyF: false
+      KeyW: false, KeyS: false, KeyA: false, KeyD: false,
+      ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+      Space: false, KeyE: false, KeyQ: false, KeyF: false,
+      ShiftLeft: false, KeyC: false, Escape: false, KeyP: false
     };
 
-    this.prevInput = { interact: false, pulse: false };
     this.camYawDeg = 0;
     this.pulseWaves = [];
+    this.lastCountdownSec = -1;
 
     this.initScene();
     this.initEntities();
     this.bindEvents();
     this.lastTime = performance.now();
     this.accumulator = 0;
-    this.tickInterval = 1000 / 60; // 60 Hz
+    this.tickInterval = 1000 / 60;
   }
 
   initScene() {
@@ -41,8 +37,9 @@ export class Game3D {
     const height = this.container.clientHeight || window.innerHeight;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0c1a);
-    this.scene.fog = new THREE.FogExp2(0x0e1124, 0.025);
+    // Bảng màu chuẩn: Trời đêm / sương (#0E1430 / #1B2350)
+    this.scene.background = new THREE.Color(0x0e1430);
+    this.scene.fog = new THREE.FogExp2(0x1b2350, 0.02);
 
     this.camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 200);
     this.camera.position.set(0, 10, 16);
@@ -53,145 +50,188 @@ export class Game3D {
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
 
-    // Ambient night moonlight
-    this.ambientLight = new THREE.AmbientLight(0x2a3558, 0.7);
+    // Ánh sáng môi trường ban đầu
+    this.ambientLight = new THREE.AmbientLight(0x2f3d6b, 0.25);
     this.scene.add(this.ambientLight);
 
-    // Overhead directional moonlight
-    const dirLight = new THREE.DirectionalLight(0x6e88c7, 0.8);
-    dirLight.position.set(20, 40, 20);
+    const dirLight = new THREE.DirectionalLight(0x7a91c9, 0.7);
+    dirLight.position.set(20, 50, 20);
     this.scene.add(dirLight);
 
-    // Build the round island: Đảo Bến (radius 30m)
-    this.createIsland();
+    // Dựng bản đồ theo Đêm 1, 2, 3
+    this.createMapTerrain();
   }
 
-  createIsland() {
-    const islandGroup = new THREE.Group();
+  createMapTerrain() {
+    const terrainGroup = new THREE.Group();
 
-    // Top grassy surface
-    const topGeo = new THREE.CylinderGeometry(30, 30.5, 2, 48);
-    const topMat = new THREE.MeshLambertMaterial({ color: 0x1d3a2e });
-    const topMesh = new THREE.Mesh(topGeo, topMat);
-    topMesh.position.y = -1;
-    islandGroup.add(topMesh);
-
-    // Island base cliff / rock
-    const baseGeo = new THREE.CylinderGeometry(30.5, 12, 14, 48);
-    const baseMat = new THREE.MeshLambertMaterial({ color: 0x131a24 });
-    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-    baseMesh.position.y = -9;
-    islandGroup.add(baseMesh);
-
-    // Cloud sea layer below island
-    const cloudGeo = new THREE.PlaneGeometry(300, 300);
-    const cloudMat = new THREE.MeshBasicMaterial({
-      color: 0x090d1f,
-      transparent: true,
-      opacity: 0.8
-    });
+    // Biển mây: #12384A
+    const cloudGeo = new THREE.PlaneGeometry(500, 500);
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0x12384a, transparent: true, opacity: 0.85 });
     const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
     cloudMesh.rotation.x = -Math.PI / 2;
     cloudMesh.position.y = -14;
-    islandGroup.add(cloudMesh);
+    terrainGroup.add(cloudMesh);
 
-    // Central ancient stone seal
-    const sealGeo = new THREE.CylinderGeometry(3, 3, 0.1, 24);
-    const sealMat = new THREE.MeshLambertMaterial({ color: 0x2e3c4e });
-    const sealMesh = new THREE.Mesh(sealGeo, sealMat);
-    sealMesh.position.y = 0.05;
-    islandGroup.add(sealMesh);
+    // Cỏ: #2F5D50 | Cát: #C9B48A | Gỗ: #6B4A2F
+    const grassMat = new THREE.MeshLambertMaterial({ color: 0x2f5d50 });
+    const woodMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2f });
+    const rockMat = new THREE.MeshLambertMaterial({ color: 0x1e2733 });
 
-    this.scene.add(islandGroup);
+    if (this.night === 1) {
+      // Đêm 1 — Đảo Bến: tròn tâm (0,0,0), bán kính 40m
+      const topGeo = new THREE.CylinderGeometry(40, 40.5, 2, 64);
+      const topMesh = new THREE.Mesh(topGeo, grassMat);
+      topMesh.position.y = -1;
+      terrainGroup.add(topMesh);
+
+      const baseGeo = new THREE.CylinderGeometry(40.5, 18, 16, 64);
+      const baseMesh = new THREE.Mesh(baseGeo, rockMat);
+      baseMesh.position.y = -10;
+      terrainGroup.add(baseMesh);
+
+    } else if (this.night === 2) {
+      // Đêm 2 — Đảo Cau: 2 đảo tròn R=28m (A: 0,0,0 & B: 70,0,0) + Cầu tre
+      for (const cx of [0, 70]) {
+        const topGeo = new THREE.CylinderGeometry(28, 28.5, 2, 48);
+        const topMesh = new THREE.Mesh(topGeo, grassMat);
+        topMesh.position.set(cx, -1, 0);
+        terrainGroup.add(topMesh);
+
+        const baseGeo = new THREE.CylinderGeometry(28.5, 12, 16, 48);
+        const baseMesh = new THREE.Mesh(baseGeo, rockMat);
+        baseMesh.position.set(cx, -10, 0);
+        terrainGroup.add(baseMesh);
+      }
+
+      // Cầu tre: x in [26, 44], z in [-2, 2]
+      const bridgeGeo = new THREE.BoxGeometry(18, 0.4, 4);
+      const bridgeMesh = new THREE.Mesh(bridgeGeo, woodMat);
+      bridgeMesh.position.set(35, -0.2, 0);
+      terrainGroup.add(bridgeMesh);
+
+      // 2 Bục nhảy: R=1m tại (20,0,18) và (50,0,-18)
+      for (const pos of [[20, 0.05, 18], [50, 0.05, -18]]) {
+        const padGeo = new THREE.CylinderGeometry(1, 1, 0.1, 24);
+        const padMat = new THREE.MeshLambertMaterial({ color: 0xf2c14e });
+        const padMesh = new THREE.Mesh(padGeo, padMat);
+        padMesh.position.set(...pos);
+        terrainGroup.add(padMesh);
+      }
+
+    } else if (this.night === 3) {
+      // Đêm 3 — Đảo Chuông: tròn R=45m, 3 tầng (0m, 3m, 6m)
+      // Tầng 0 (Y=0, R=45m)
+      const t0Geo = new THREE.CylinderGeometry(45, 45.5, 2, 64);
+      const t0Mesh = new THREE.Mesh(t0Geo, grassMat);
+      t0Mesh.position.y = -1;
+      terrainGroup.add(t0Mesh);
+
+      // Tầng 1 (Y=3, R in [12, 24] nửa z > 0)
+      const t1Geo = new THREE.CylinderGeometry(24, 24, 3, 48, 1, false, 0, Math.PI);
+      const t1Mesh = new THREE.Mesh(t1Geo, grassMat);
+      t1Mesh.position.y = 1.5;
+      terrainGroup.add(t1Mesh);
+
+      // Tầng 2 (Y=6, R=8m)
+      const t2Geo = new THREE.CylinderGeometry(8, 8, 3, 32);
+      const t2Mesh = new THREE.Mesh(t2Geo, grassMat);
+      t2Mesh.position.y = 4.5;
+      terrainGroup.add(t2Mesh);
+
+      // Tháp chuông ở tâm tầng 2: hình trụ R=2m, cao 8m
+      const towerGeo = new THREE.CylinderGeometry(2, 2.2, 8, 20);
+      const towerMat = new THREE.MeshLambertMaterial({ color: 0x5b5f6e });
+      const towerMesh = new THREE.Mesh(towerGeo, towerMat);
+      towerMesh.position.set(0, 10, 0);
+      terrainGroup.add(towerMesh);
+
+      // Bục nhảy tầng 1 tại (0, 3, 13)
+      const padGeo = new THREE.CylinderGeometry(1, 1, 0.1, 24);
+      const padMat = new THREE.MeshLambertMaterial({ color: 0xf2c14e });
+      const padMesh = new THREE.Mesh(padGeo, padMat);
+      padMesh.position.set(0, 3.05, 13);
+      terrainGroup.add(padMesh);
+    }
+
+    this.scene.add(terrainGroup);
   }
 
   initEntities() {
-    // 1. Player (Mây)
+    // 1. Mây (Áo Mây #E8E2D0, Khăn Mây #C8102E, Nón lá #C9B48A)
     this.playerGroup = new THREE.Group();
 
-    // Body
-    const bodyGeo = new THREE.CapsuleGeometry
-      ? new THREE.CapsuleGeometry(0.35, 0.7, 8, 16)
-      : new THREE.CylinderGeometry(0.35, 0.35, 1.2, 12);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4a78a6 });
+    const bodyGeo = new THREE.CylinderGeometry(0.35, 0.35, 1.2, 16);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0xe8e2d0 });
     const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-    bodyMesh.position.y = 0.7;
+    bodyMesh.position.y = 0.6;
     this.playerGroup.add(bodyMesh);
 
-    // Conical hat (Nón Lá)
-    const hatGeo = new THREE.ConeGeometry(0.7, 0.35, 20);
-    const hatMat = new THREE.MeshLambertMaterial({ color: 0xbf9b60 });
+    const scarfGeo = new THREE.TorusGeometry(0.36, 0.08, 8, 16);
+    const scarfMat = new THREE.MeshLambertMaterial({ color: 0xc8102e });
+    const scarfMesh = new THREE.Mesh(scarfGeo, scarfMat);
+    scarfMesh.rotation.x = Math.PI / 2;
+    scarfMesh.position.y = 1.1;
+    this.playerGroup.add(scarfMesh);
+
+    const hatGeo = new THREE.ConeGeometry(0.75, 0.35, 24);
+    const hatMat = new THREE.MeshLambertMaterial({ color: 0xc9b48a });
     const hatMesh = new THREE.Mesh(hatGeo, hatMat);
     hatMesh.position.y = 1.45;
     this.playerGroup.add(hatMesh);
 
-    // Small hanging lantern on Mây's staff / hat
-    const miniLanternGeo = new THREE.SphereGeometry(0.12, 10, 10);
-    this.miniLanternMat = new THREE.MeshBasicMaterial({ color: 0xffaa33 });
-    const miniLanternMesh = new THREE.Mesh(miniLanternGeo, this.miniLanternMat);
-    miniLanternMesh.position.set(0.4, 1.1, 0.2);
-    this.playerGroup.add(miniLanternMesh);
-
-    // Player personal warm light
-    this.playerLight = new THREE.PointLight(0xff9922, 1.2, 7);
+    this.playerLight = new THREE.PointLight(0xffb347, 1.0, 8);
     this.playerLight.position.set(0, 1.2, 0);
     this.playerGroup.add(this.playerLight);
 
     this.scene.add(this.playerGroup);
 
-    // 2. 5 Large Lanterns
+    // 2. Đèn Lồng
     this.lanternMeshes = [];
-    this.lanternLights = [];
-
     this.engine.lanterns.forEach(lanternData => {
-      const lanternGroup = new THREE.Group();
-      lanternGroup.position.set(lanternData.pos[0], 0, lanternData.pos[2]);
+      const g = new THREE.Group();
+      g.position.set(lanternData.pos[0], lanternData.pos[1], lanternData.pos[2]);
 
-      // Wooden pole
       const poleGeo = new THREE.CylinderGeometry(0.12, 0.16, 3.2, 12);
-      const poleMat = new THREE.MeshLambertMaterial({ color: 0x3d2716 });
+      const poleMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2f });
       const poleMesh = new THREE.Mesh(poleGeo, poleMat);
       poleMesh.position.y = 1.6;
-      lanternGroup.add(poleMesh);
+      g.add(poleMesh);
 
-      // Large Lantern Sphere / Octagon
-      const cageGeo = new THREE.CylinderGeometry(0.7, 0.6, 1.2, 8);
-      const cageMat = new THREE.MeshLambertMaterial({
-        color: 0x221a14,
-        wireframe: false
-      });
-      const cageMesh = new THREE.Mesh(cageGeo, cageMat);
-      cageMesh.position.y = 2.4;
-      lanternGroup.add(cageMesh);
-
-      // Inner lantern light bulb
-      const bulbGeo = new THREE.SphereGeometry(0.45, 16, 16);
-      const bulbMat = new THREE.MeshBasicMaterial({
-        color: lanternData.lit ? 0xff9900 : 0x221105
-      });
+      const bulbGeo = new THREE.SphereGeometry(0.5, 16, 16);
+      const bulbMat = new THREE.MeshBasicMaterial({ color: 0x5b5f6e });
       const bulbMesh = new THREE.Mesh(bulbGeo, bulbMat);
       bulbMesh.position.y = 2.4;
-      lanternGroup.add(bulbMesh);
+      g.add(bulbMesh);
 
-      // Point Light
-      const pLight = new THREE.PointLight(0xff9922, lanternData.lit ? 3.5 : 0.2, 16);
-      pLight.position.set(0, 2.5, 0);
-      lanternGroup.add(pLight);
+      const light = new THREE.PointLight(0xffb347, 0.2, 16);
+      light.position.set(0, 2.5, 0);
+      g.add(light);
 
-      this.scene.add(lanternGroup);
-      this.lanternMeshes.push({ id: lanternData.id, group: lanternGroup, bulb: bulbMesh, light: pLight });
+      this.scene.add(g);
+      this.lanternMeshes.push({ id: lanternData.id, group: g, bulb: bulbMesh, light: light });
     });
 
-    // 3. Motes (Đom đóm)
+    // 3. Motes (Đom đóm: lõi #FFF6C2, quầng #FFE58A)
     this.moteMeshMap = new Map();
-    this.moteGeo = new THREE.SphereGeometry(0.15, 10, 10);
-    this.moteMat = new THREE.MeshBasicMaterial({ color: 0xffea55 });
+    this.moteGeo = new THREE.SphereGeometry(0.16, 12, 12);
+    this.moteMat = new THREE.MeshBasicMaterial({ color: 0xfff6c2 });
 
-    // 4. Shades (Bóng Mực)
+    // 4. Bóng Mực (thân #120A1A, choáng #3A3450)
     this.shadeMeshMap = new Map();
-    this.shadeGeo = new THREE.SphereGeometry(0.65, 14, 14);
-    this.shadeMat = new THREE.MeshLambertMaterial({ color: 0x160524 });
-    this.shadeStunMat = new THREE.MeshLambertMaterial({ color: 0x472e6b });
+    this.shadeGeo = new THREE.SphereGeometry(0.65, 16, 16);
+    this.shadeMat = new THREE.MeshLambertMaterial({ color: 0x120a1a });
+    this.shadeStunMat = new THREE.MeshLambertMaterial({ color: 0x3a3450 });
+
+    // 5. Gió Lạc (Drifters: #8FA3B8)
+    this.drifterMeshMap = new Map();
+    this.drifterGeo = new THREE.CylinderGeometry(0.2, 0.05, 1.8, 12);
+    this.drifterMat = new THREE.MeshLambertMaterial({ color: 0x8fa3b8 });
+
+    // 6. Bùa Gió (Charms: #C8102E viền #F2C14E)
+    this.charmMeshMap = new Map();
+    this.charmGeo = new THREE.BoxGeometry(0.6, 0.8, 0.1);
+    this.charmMat = new THREE.MeshLambertMaterial({ color: 0xc8102e });
   }
 
   bindEvents() {
@@ -226,14 +266,20 @@ export class Game3D {
     if (this.keys.KeyD || this.keys.ArrowRight) rawX += 1;
     if (this.keys.KeyA || this.keys.ArrowLeft) rawX -= 1;
 
+    const jump = Boolean(this.keys.Space);
     const interact = Boolean(this.keys.KeyE);
     const pulse = Boolean(this.keys.KeyQ || this.keys.KeyF);
+    const dash = Boolean(this.keys.ShiftLeft || this.keys.KeyC);
+    const pause = Boolean(this.keys.Escape || this.keys.KeyP);
 
     return {
       move: [rawX, rawZ],
       cam_yaw_deg: this.camYawDeg,
+      jump: jump,
       interact: interact,
-      pulse: pulse
+      pulse: pulse,
+      dash: dash,
+      pause: pause
     };
   }
 
@@ -242,10 +288,11 @@ export class Game3D {
     this.engine.setInput(input);
     const events = this.engine.step();
 
-    // Trigger visual and audio effects from events
     for (const ev of events) {
       if (ev.name === 'mote_picked') {
         this.sound.playMoteChime();
+      } else if (ev.name === 'dash') {
+        this.sound.playDashSound();
       } else if (ev.name === 'pulse') {
         this.sound.playPulseSound();
         this.triggerPulseWave();
@@ -253,119 +300,147 @@ export class Game3D {
         this.sound.playLanternLitSound();
       } else if (ev.name === 'player_hit') {
         this.sound.playHitSound();
+      } else if (ev.name === 'charm_picked') {
+        this.sound.playCharmSound();
       }
     }
 
-    this.prevInput = { interact: input.interact, pulse: input.pulse };
+    // 10s countdown beep
+    const sec = Math.ceil(this.engine.time_left_s);
+    if (sec <= 10 && sec > 0 && sec !== this.lastCountdownSec) {
+      this.lastCountdownSec = sec;
+      this.sound.playCountdownBeep();
+    }
   }
 
   triggerPulseWave() {
     const geo = new THREE.RingGeometry(0.5, 1.0, 32);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xffaa22,
+      color: 0xffb347,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.9
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(this.engine.player.pos[0], 0.1, this.engine.player.pos[2]);
+    mesh.position.set(this.engine.player.pos[0], this.engine.player.pos[1] + 0.1, this.engine.player.pos[2]);
     this.scene.add(mesh);
 
     this.pulseWaves.push({ mesh, radius: 1.0, opacity: 0.9 });
   }
 
   updateVisuals(time) {
-    // 1. Update Player Position & Rotation
+    // 1. Player
     this.playerGroup.position.set(
       this.engine.player.pos[0],
       this.engine.player.pos[1],
       this.engine.player.pos[2]
     );
 
-    // Make player face movement direction
-    const [rawX, rawZ] = this.engine.currentInput.move;
-    if (rawX !== 0 || rawZ !== 0) {
-      const angle = Math.atan2(rawX, rawZ);
-      this.playerGroup.rotation.y = angle;
-    }
+    const rad = (this.engine.player.facing_deg * Math.PI) / 180.0;
+    this.playerGroup.rotation.y = rad;
 
-    // Flicker mini lantern
-    const flicker = 1.0 + Math.sin(time * 0.01) * 0.2;
-    this.playerLight.intensity = (1.0 + this.engine.player.carried * 0.4) * flicker;
+    // Ánh sáng môi trường tăng theo tiến độ: cường độ = 0.15 + 0.55 * (đèn sáng / tổng đèn)
+    const litCount = this.engine.lanterns.filter(l => l.lit).length;
+    const progress = litCount / this.engine.lanterns.length;
+    this.ambientLight.intensity = 0.15 + 0.55 * progress;
 
-    // 2. Camera follow (smooth 3rd-person)
+    // 2. Camera follow
     const targetCamX = this.engine.player.pos[0];
     const targetCamZ = this.engine.player.pos[2] + 12;
+    const targetCamY = this.engine.player.pos[1] + 8;
     this.camera.position.x += (targetCamX - this.camera.position.x) * 0.08;
     this.camera.position.z += (targetCamZ - this.camera.position.z) * 0.08;
-    this.camera.position.y = 9;
-    this.camera.lookAt(this.engine.player.pos[0], 1.2, this.engine.player.pos[2]);
+    this.camera.position.y += (targetCamY - this.camera.position.y) * 0.08;
+    this.camera.lookAt(this.engine.player.pos[0], this.engine.player.pos[1] + 1.2, this.engine.player.pos[2]);
 
-    // 3. Update Lanterns
+    // 3. Lanterns
     this.engine.lanterns.forEach(lanternData => {
       const found = this.lanternMeshes.find(m => m.id === lanternData.id);
       if (found) {
         if (lanternData.lit) {
-          found.bulb.material.color.setHex(0xffaa22);
-          found.light.color.setHex(0xff9911);
-          found.light.intensity = 3.5 + Math.sin(time * 0.005 + lanternData.id.charCodeAt(1)) * 0.4;
+          found.bulb.material.color.setHex(0xffb347);
+          found.light.color.setHex(0xffb347);
+          found.light.intensity = 3.5;
         } else {
-          // Glow partially based on deposited amount
-          const progress = lanternData.deposited / this.engine.tuning.lantern_cost;
-          found.bulb.material.color.setHex(progress > 0 ? 0x774411 : 0x221105);
-          found.light.intensity = 0.2 + progress * 1.0;
+          const ratio = lanternData.deposited / this.engine.tuning.lantern_cost;
+          found.bulb.material.color.setHex(ratio > 0 ? 0x8a6020 : 0x5b5f6e);
+          found.light.intensity = 0.2 + ratio * 1.0;
         }
       }
     });
 
-    // 4. Update Motes (Đom đóm)
-    const currentMoteIds = new Set(this.engine.motes.map(m => m.id));
-    // Remove picked motes
+    // 4. Motes
+    const curMoteIds = new Set(this.engine.motes.map(m => m.id));
     for (const [id, mesh] of this.moteMeshMap.entries()) {
-      if (!currentMoteIds.has(id)) {
+      if (!curMoteIds.has(id)) {
         this.scene.remove(mesh);
         this.moteMeshMap.delete(id);
       }
     }
-    // Add/update active motes
-    this.engine.motes.forEach(moteData => {
-      let mesh = this.moteMeshMap.get(moteData.id);
+    this.engine.motes.forEach(m => {
+      let mesh = this.moteMeshMap.get(m.id);
       if (!mesh) {
         mesh = new THREE.Mesh(this.moteGeo, this.moteMat);
         this.scene.add(mesh);
-        this.moteMeshMap.set(moteData.id, mesh);
+        this.moteMeshMap.set(m.id, mesh);
       }
-      const bobbing = Math.sin(time * 0.004 + Number(moteData.id.replace('M', ''))) * 0.3 + 0.6;
-      mesh.position.set(moteData.pos[0], bobbing, moteData.pos[2]);
+      const bob = Math.sin(time * 0.005 + (m.pos[0] + m.pos[2])) * 0.2 + 0.4;
+      mesh.position.set(m.pos[0], m.pos[1] + bob, m.pos[2]);
     });
 
-    // 5. Update Shades (Bóng Mực)
-    const currentShadeIds = new Set(this.engine.shades.map(s => s.id));
+    // 5. Shades
+    const curShadeIds = new Set(this.engine.shades.map(s => s.id));
     for (const [id, mesh] of this.shadeMeshMap.entries()) {
-      if (!currentShadeIds.has(id)) {
+      if (!curShadeIds.has(id)) {
         this.scene.remove(mesh);
         this.shadeMeshMap.delete(id);
       }
     }
-    this.engine.shades.forEach(shadeData => {
-      let mesh = this.shadeMeshMap.get(shadeData.id);
+    this.engine.shades.forEach(s => {
+      let mesh = this.shadeMeshMap.get(s.id);
       if (!mesh) {
         mesh = new THREE.Mesh(this.shadeGeo, this.shadeMat);
         this.scene.add(mesh);
-        this.shadeMeshMap.set(shadeData.id, mesh);
+        this.shadeMeshMap.set(s.id, mesh);
       }
-      mesh.position.set(shadeData.pos[0], 0.7, shadeData.pos[2]);
-      if (shadeData.state === 'stunned') {
-        mesh.material = this.shadeStunMat;
-        mesh.scale.set(0.8, 0.8, 0.8);
-      } else {
-        mesh.material = this.shadeMat;
-        mesh.scale.set(1.0, 1.0, 1.0);
-      }
+      mesh.position.set(s.pos[0], s.pos[1] + 0.7, s.pos[2]);
+      mesh.material = s.state === 'stunned' ? this.shadeStunMat : this.shadeMat;
     });
 
-    // 6. Update Pulse Waves
+    // 6. Drifters (Gió Lạc)
+    const curDrifterIds = new Set(this.engine.drifters.map(d => d.id));
+    for (const [id, mesh] of this.drifterMeshMap.entries()) {
+      if (!curDrifterIds.has(id)) {
+        this.scene.remove(mesh);
+        this.drifterMeshMap.delete(id);
+      }
+    }
+    this.engine.drifters.forEach(d => {
+      let mesh = this.drifterMeshMap.get(d.id);
+      if (!mesh) {
+        mesh = new THREE.Mesh(this.drifterGeo, this.drifterMat);
+        this.scene.add(mesh);
+        this.drifterMeshMap.set(d.id, mesh);
+      }
+      mesh.position.set(d.pos[0], d.pos[1], d.pos[2]);
+      mesh.rotation.z = Math.sin(time * 0.01) * 0.3;
+    });
+
+    // 7. Charms (Bùa Gió)
+    for (const c of this.engine.charms) {
+      let mesh = this.charmMeshMap.get(c.id);
+      if (!mesh) {
+        mesh = new THREE.Mesh(this.charmGeo, this.charmMat);
+        this.scene.add(mesh);
+        this.charmMeshMap.set(c.id, mesh);
+      }
+      mesh.visible = c.available;
+      mesh.position.set(c.pos[0], c.pos[1] + 0.5, c.pos[2]);
+      mesh.rotation.y = time * 0.002;
+    }
+
+    // 8. Pulse Waves
     for (let i = this.pulseWaves.length - 1; i >= 0; i--) {
       const pw = this.pulseWaves[i];
       pw.radius += 0.25;
@@ -403,17 +478,11 @@ export class Game3D {
     });
   }
 
-  restart() {
-    // Reset engine
-    this.engine = new IslandEngine({ seed: Math.floor(Math.random() * 10000) });
-    // Reset visual lights
-    this.engine.lanterns.forEach(lanternData => {
-      const found = this.lanternMeshes.find(m => m.id === lanternData.id);
-      if (found) {
-        found.bulb.material.color.setHex(0x221105);
-        found.light.color.setHex(0xff9922);
-        found.light.intensity = 0.2;
-      }
+  restart(night = this.night) {
+    this.night = night;
+    this.engine = new IslandEngine({
+      seed: Math.floor(Math.random() * 10000),
+      night: this.night
     });
   }
 }

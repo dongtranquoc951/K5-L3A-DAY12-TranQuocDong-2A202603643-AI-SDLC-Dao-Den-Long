@@ -81,6 +81,7 @@ export function runHeadless(rawArgs) {
 
   const engine = new IslandEngine({
     seed: options.seed,
+    night: options.night,
     scenario: scenarioData
   });
 
@@ -105,7 +106,7 @@ export function runHeadless(rawArgs) {
       outputLines.push(JSON.stringify(engine.getSnapshot()));
     }
 
-    if (engine.state !== 'playing') {
+    if (engine.state !== 'playing' && engine.state !== 'paused') {
       break;
     }
   }

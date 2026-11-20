@@ -3,20 +3,18 @@
 Học viên: Trần Quốc Đồng (MSSV: 2A202603643)
 
 ## Phase 0: Chuẩn Bị & Khởi Tạo Môi Trường
-- **Mục tiêu**: Tạo cấu trúc chuẩn cho dự án, harness AI `AGENTS.md`, cấu hình test runner.
-- **Quyết định kiến trúc**: Chọn Node.js và Three.js để dễ dàng chạy đa nền tảng (Windows/macOS/Linux), đảm bảo core logic chạy headless không phụ thuộc vào window/GPU.
+- Thiết lập kiến trúc Core vs Render, cấu hình `package.json`, `AGENTS.md`.
 
 ## Phase 1: PRD-0 & Test Contract v1.0
-- **Phân tích yêu cầu**:
-  - Tách bạch yêu cầu bắt buộc: Test Contract v1.0, các sự kiện (`mote_picked`, `deposit`, `lantern_lit`, `pulse`, `player_hit`, `game_over`), định dạng JSONL, tính tất định (`determinism`).
-  - Xác định các thông số tuning đưa vào `game.contract.json`.
-- **Harness đã sử dụng**:
-  - `AGENTS.md`: Quy định rõ lệnh test, lệnh headless và quy tắc tách biệt core vs render.
-  - Bộ kiểm thử tự động với 8 test case kiểm tra mọi kịch bản (thu thập, nạp đèn, làm choáng, sát thương, thắng/thua, tính tất định).
-- **Ước tính Token & Tối ưu hóa**:
-  - Giữ ngữ cảnh ngắn gọn, đọc file theo đúng mục tiêu.
-  - Sử dụng các file fixture JSON nhỏ gọn để kiểm thử tự động, tránh lãng phí token vào các vòng lặp kiểm tra thủ công.
-  - Chi phí token ước tính cho Phase 1: ~35k prompt tokens, ~6k completion tokens.
-- **Tự đánh giá & Retro Phase 1**:
-  - *Điểm tốt*: Core logic chạy mượt mà, đạt 100% tiêu chí Test Contract v1.0, test chạy trong 300ms. Game 3D chơi được với đầy đủ HUD, âm thanh và hiệu ứng.
-  - *Bài học*: Việc viết test kịch bản trước khi code logic giúp phát hiện ngay các trường hợp biên của việc chuyển đổi tick và góc quay camera.
+- Hiện thực hóa core game Đêm 1 (Đảo Bến), 8 test suite, xuất bản tag `phase-1`.
+
+## Phase 2: Ticket-02 — "Ba Hòn Đảo" & Test Contract v1.1
+- **Phân tích thay đổi**:
+  - Chuẩn hóa toàn bộ số liệu: tốc độ chạy 6.0 m/s, nhảy 7.0 m/s, trọng lực -20 m/s², lướt 14 m/s (12 ticks, cd 90 ticks).
+  - Đèn cần 10 đom đóm, Tỏa Sáng cần 3 đom đóm, điểm số chuẩn hóa tính khi nạp đom đóm (+10), thắp đèn (+100), choáng bóng mực (+5).
+  - Tách bạch thứ tự xử lý nghiêm ngặt trong 1 tick: Pause -> Giảm đếm -> Di chuyển Mây -> Nhặt đom đóm & Bùa -> Tương tác đèn -> Vùng an toàn -> Tỏa Sáng -> Di chuyển địch -> Va chạm -> Sinh thực thể -> Xét thắng thua.
+- **Xử lý hồi quy (Regression)**:
+  - Cập nhật các test cũ của Phase 1 sang số chuẩn (chi phí đèn 10, chi phí tỏa sáng 3, điểm số tính theo nạp). Cả 8 test cũ đều xanh.
+- **Tối ưu hóa Token & Hiệu Năng**:
+  - Tận dụng cấu trúc dữ liệu Map và PRNG Mulberry32 tối ưu giúp chạy 21.600 ticks mô phỏng chỉ trong **~780ms**, vượt xa yêu cầu $\le 30\text{ s}$.
+  - Ước tính token sử dụng cho Phase 2: ~42k prompt tokens, ~8k completion tokens.

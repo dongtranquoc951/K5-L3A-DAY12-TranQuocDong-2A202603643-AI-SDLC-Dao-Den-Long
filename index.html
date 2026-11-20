@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Đảo Đèn Lồng — 3D Game (Phase 1)</title>
+  <title>Đảo Đèn Lồng — 3D Game (Phase 2: Ba Hòn Đảo)</title>
   <style>
     * {
       box-sizing: border-box;
@@ -15,9 +15,9 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #080a14;
+      background-color: #0e1430;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #fff;
+      color: #f5f1e6;
     }
     #game-container {
       width: 100%;
@@ -27,136 +27,202 @@
       left: 0;
     }
 
-    /* HUD Header */
-    #hud {
+    /* HUD Top */
+    #hud-top {
       position: absolute;
       top: 16px;
-      left: 16px;
-      right: 16px;
+      left: 20px;
+      right: 20px;
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       pointer-events: none;
       z-index: 10;
     }
-    .hud-card {
-      background: rgba(14, 18, 36, 0.85);
-      border: 1px solid rgba(255, 170, 50, 0.3);
+    .hud-box {
+      background: rgba(14, 20, 48, 0.88);
+      border: 1px solid rgba(242, 193, 78, 0.35);
       border-radius: 12px;
-      padding: 12px 20px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      padding: 10px 18px;
       backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
-    .hud-title {
-      font-size: 13px;
-      color: #ffcc66;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
-    .hud-value {
+    #flames-box {
       font-size: 22px;
-      font-weight: bold;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      letter-spacing: 4px;
     }
-    .flames-icon {
-      color: #ff5533;
-      text-shadow: 0 0 10px rgba(255, 80, 40, 0.8);
+    #timer-box {
+      font-size: 24px;
+      font-weight: bold;
+      color: #f5f1e6;
+      text-align: center;
+    }
+    #timer-box.urgent {
+      color: #ff5a5f;
+      animation: blink 0.8s infinite alternate;
+    }
+    @keyframes blink {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0.4; transform: scale(1.05); }
+    }
+    #score-lanterns-box {
+      text-align: right;
+      font-size: 15px;
+      color: #f2c14e;
     }
 
-    /* Bottom Control Bar & Instructions */
-    #controls-hint {
+    /* Bottom HUD: 10-slot mote bar & Cooldown icons */
+    #hud-bottom {
       position: absolute;
-      bottom: 20px;
+      bottom: 24px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(12, 16, 32, 0.8);
-      border: 1px solid rgba(255, 200, 100, 0.2);
-      border-radius: 24px;
-      padding: 10px 24px;
       display: flex;
-      gap: 20px;
-      font-size: 13px;
-      color: #ddd;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
       pointer-events: none;
       z-index: 10;
     }
-    .key-badge {
-      background: rgba(255, 180, 50, 0.25);
-      border: 1px solid rgba(255, 180, 50, 0.5);
+    #mote-bar {
+      display: flex;
+      gap: 6px;
+      background: rgba(14, 20, 48, 0.85);
+      border: 1px solid rgba(242, 193, 78, 0.3);
+      border-radius: 20px;
+      padding: 8px 16px;
+    }
+    .mote-slot {
+      width: 14px;
+      height: 22px;
       border-radius: 6px;
-      padding: 2px 7px;
-      font-weight: bold;
-      color: #ffea88;
+      border: 1px solid #5b5f6e;
+      background: #1b2350;
+      transition: all 0.2s ease;
+    }
+    .mote-slot.filled {
+      background: #fff6c2;
+      border-color: #f2c14e;
+      box-shadow: 0 0 10px #ffe58a;
     }
 
-    /* Game Over Modal */
-    #modal-overlay {
+    /* Cooldown indicators */
+    #cooldowns {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .cd-badge {
+      background: rgba(14, 20, 48, 0.85);
+      border: 1px solid #f2c14e;
+      border-radius: 12px;
+      padding: 8px 14px;
+      text-align: center;
+      font-size: 12px;
+    }
+    .cd-badge.ready {
+      border-color: #55ff88;
+      box-shadow: 0 0 8px rgba(85, 255, 136, 0.4);
+    }
+
+    /* Interact Prompt */
+    #interact-prompt {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(242, 193, 78, 0.9);
+      color: #120a1a;
+      font-weight: bold;
+      padding: 6px 16px;
+      border-radius: 16px;
+      font-size: 14px;
+      display: none;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Off-screen Lantern Arrow */
+    #nav-arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-bottom: 20px solid #f2c14e;
+      pointer-events: none;
+      display: none;
+      z-index: 10;
+      transform-origin: center 20px;
+    }
+
+    /* Overlay Modal (Pause, Story Intro, Night Won, Game Over) */
+    .modal-overlay {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(5, 7, 15, 0.85);
+      background: rgba(10, 14, 34, 0.9);
+      backdrop-filter: blur(8px);
       display: none;
       justify-content: center;
       align-items: center;
       z-index: 100;
-      backdrop-filter: blur(6px);
     }
-    .modal-content {
-      background: #12182b;
-      border: 2px solid #ffaa33;
+    .modal-card {
+      background: #141b3d;
+      border: 2px solid #f2c14e;
       border-radius: 16px;
-      padding: 32px 48px;
+      padding: 32px 40px;
       text-align: center;
-      max-width: 420px;
-      box-shadow: 0 0 40px rgba(255, 170, 50, 0.3);
+      max-width: 480px;
+      box-shadow: 0 0 35px rgba(242, 193, 78, 0.3);
     }
-    .modal-title {
-      font-size: 32px;
-      font-weight: bold;
+    .modal-card h2 {
+      font-size: 28px;
       margin-bottom: 12px;
+      color: #f2c14e;
     }
-    .modal-title.won {
-      color: #ffcc33;
-      text-shadow: 0 0 15px rgba(255, 200, 50, 0.7);
-    }
-    .modal-title.lost {
-      color: #ff4444;
-      text-shadow: 0 0 15px rgba(255, 60, 60, 0.7);
-    }
-    .modal-desc {
-      font-size: 16px;
-      color: #ccc;
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-    .modal-score {
-      font-size: 26px;
-      color: #fff;
-      font-weight: bold;
+    .modal-card p {
+      font-size: 15px;
+      line-height: 1.6;
       margin-bottom: 24px;
+      color: #e8e2d0;
     }
-    .btn-restart {
-      background: linear-gradient(135deg, #ff9922, #dd6600);
-      border: none;
-      border-radius: 30px;
-      padding: 12px 36px;
-      font-size: 16px;
+    .modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .btn {
+      background: linear-gradient(135deg, #f2c14e, #c99320);
+      color: #120a1a;
       font-weight: bold;
-      color: #fff;
+      border: none;
+      border-radius: 24px;
+      padding: 12px 24px;
+      font-size: 15px;
       cursor: pointer;
-      box-shadow: 0 4px 15px rgba(255, 120, 0, 0.4);
       transition: all 0.2s ease;
-      pointer-events: auto;
     }
-    .btn-restart:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 22px rgba(255, 150, 0, 0.6);
+    .btn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 4px 15px rgba(242, 193, 78, 0.5);
+    }
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f5f1e6;
+      border: 1px solid #5b5f6e;
+    }
+    .btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
   </style>
   <script src="src/render/three.min.js"></script>
@@ -164,117 +230,259 @@
 <body>
   <div id="game-container"></div>
 
-  <!-- HUD -->
-  <div id="hud">
-    <div class="hud-card">
-      <div class="hud-title">Sinh lực (Ngọn lửa)</div>
-      <div class="hud-value" id="hud-flames">
-        <span class="flames-icon">🔥🔥🔥</span>
-      </div>
+  <!-- HUD Top -->
+  <div id="hud-top">
+    <div class="hud-box" id="flames-box">
+      <span id="hud-flames">🔥🔥🔥</span>
     </div>
 
-    <div class="hud-card">
-      <div class="hud-title">Đom đóm mang theo</div>
-      <div class="hud-value" id="hud-carried">
-        <span>🏮 0 / 5</span>
-      </div>
+    <div class="hud-box" id="timer-box">
+      <span id="hud-timer">05:00</span>
+      <div style="font-size: 11px; color: #8fa3b8;" id="hud-night-name">Đêm 1 — Đảo Bến</div>
     </div>
 
-    <div class="hud-card">
-      <div class="hud-title">Đèn Lồng Đã Thắp</div>
-      <div class="hud-value" id="hud-lanterns">
-        <span>0 / 5</span>
-      </div>
+    <div class="hud-box" id="score-lanterns-box">
+      <div id="hud-lanterns">Đèn: 0 / 5</div>
+      <div id="hud-score" style="font-size: 18px; font-weight: bold; color: #fff;">0 pts</div>
     </div>
+  </div>
 
-    <div class="hud-card">
-      <div class="hud-title">Thời Gian & Điểm</div>
-      <div class="hud-value" id="hud-time-score">
-        <span style="font-size: 18px; color: #88ccff;" id="hud-time">180s</span>
-        <span style="font-size: 16px; color: #ffcc55; margin-left: 12px;" id="hud-score">0 pts</span>
+  <!-- Interact Prompt -->
+  <div id="interact-prompt">E — Nạp ánh sáng (x/10)</div>
+
+  <!-- Off-screen indicator -->
+  <div id="nav-arrow"></div>
+
+  <!-- HUD Bottom (10 Mote Slots) -->
+  <div id="hud-bottom">
+    <div id="mote-bar">
+      <div class="mote-slot"></div><div class="mote-slot"></div>
+      <div class="mote-slot"></div><div class="mote-slot"></div>
+      <div class="mote-slot"></div><div class="mote-slot"></div>
+      <div class="mote-slot"></div><div class="mote-slot"></div>
+      <div class="mote-slot"></div><div class="mote-slot"></div>
+    </div>
+    <div style="font-size: 12px; color: #8fa3b8;">WASD: Di chuyển | Shift: Lướt | Space: Nhảy | Q: Tỏa Sáng | E: Nạp Đèn</div>
+  </div>
+
+  <!-- Cooldowns -->
+  <div id="cooldowns">
+    <div class="cd-badge" id="cd-dash">Shift (Lướt)<br><span id="cd-dash-val">Sẵn sàng</span></div>
+    <div class="cd-badge" id="cd-pulse">Q (Tỏa Sáng)<br><span id="cd-pulse-val">Sẵn sàng</span></div>
+  </div>
+
+  <!-- Pause Menu Modal -->
+  <div class="modal-overlay" id="modal-pause">
+    <div class="modal-card">
+      <h2>Tạm Dừng Trò Chơi</h2>
+      <p>Hành trình của Mây đang tạm nghỉ trong sương đêm.</p>
+      <div class="modal-actions">
+        <button class="btn" id="btn-resume">Tiếp Tục Chơi</button>
+        <button class="btn secondary" id="btn-restart-night">Chơi Lại Đêm Này</button>
       </div>
     </div>
   </div>
 
-  <!-- Controls Reminder -->
-  <div id="controls-hint">
-    <div><span class="key-badge">WASD</span> Di chuyển</div>
-    <div><span class="key-badge">E</span> Nạp đom đóm vào Đèn</div>
-    <div><span class="key-badge">Q</span> / <span class="key-badge">F</span> Tỏa sáng (xua Bóng Mực)</div>
+  <!-- Night Intro Modal -->
+  <div class="modal-overlay" id="modal-intro">
+    <div class="modal-card">
+      <h2 id="intro-title">Đêm 1 — Đảo Bến</h2>
+      <p id="intro-story">"Mây con, hãy thu thập những đốm sáng đom đóm trong đêm sương và thắp lại các Đèn Lồng Lớn. Hãy cẩn thận với Bóng Mực!" — Lời Ông Đăng</p>
+      <button class="btn" id="btn-start-night">Bắt Đầu Thắp Sáng</button>
+    </div>
   </div>
 
-  <!-- Modal -->
-  <div id="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-title" id="modal-title">Chiến Thắng!</div>
-      <div class="modal-desc" id="modal-desc">Bạn đã thắp sáng toàn bộ 5 Đèn Lồng Lớn trên Đảo Bến!</div>
-      <div class="modal-score" id="modal-score">Điểm: 0</div>
-      <button class="btn-restart" id="btn-restart">Chơi Lại</button>
+  <!-- Night Complete / Victory Modal -->
+  <div class="modal-overlay" id="modal-result">
+    <div class="modal-card">
+      <h2 id="result-title">Hoàn Thành Đêm!</h2>
+      <p id="result-desc">Tất cả ngọn đèn đã thắp sáng rực rỡ.</p>
+      <div id="result-score" style="font-size: 22px; color: #f2c14e; font-weight: bold; margin-bottom: 20px;">Điểm: 0</div>
+      <button class="btn" id="btn-next-night">Đêm Tiếp Theo</button>
     </div>
   </div>
 
   <script type="module">
     import { Game3D } from './src/render/game3d.js';
 
+    let currentNight = 1;
+    let totalScore = 0;
     const container = document.getElementById('game-container');
-    const game = new Game3D(container);
+    const game = new Game3D(container, currentNight);
     game.start();
 
-    // Elements
+    // DOM Elements
     const elFlames = document.getElementById('hud-flames');
-    const elCarried = document.getElementById('hud-carried');
+    const elTimer = document.getElementById('hud-timer');
+    const timerBox = document.getElementById('timer-box');
+    const elNightName = document.getElementById('hud-night-name');
     const elLanterns = document.getElementById('hud-lanterns');
-    const elTime = document.getElementById('hud-time');
     const elScore = document.getElementById('hud-score');
-    const modalOverlay = document.getElementById('modal-overlay');
-    const modalTitle = document.getElementById('modal-title');
-    const modalDesc = document.getElementById('modal-desc');
-    const modalScore = document.getElementById('modal-score');
-    const btnRestart = document.getElementById('btn-restart');
+    const moteSlots = document.querySelectorAll('.mote-slot');
+    const cdDash = document.getElementById('cd-dash');
+    const cdDashVal = document.getElementById('cd-dash-val');
+    const cdPulse = document.getElementById('cd-pulse');
+    const cdPulseVal = document.getElementById('cd-pulse-val');
+    const elPrompt = document.getElementById('interact-prompt');
 
-    btnRestart.addEventListener('click', () => {
-      modalOverlay.style.display = 'none';
-      game.restart();
+    const modalPause = document.getElementById('modal-pause');
+    const btnResume = document.getElementById('btn-resume');
+    const btnRestartNight = document.getElementById('btn-restart-night');
+
+    const modalIntro = document.getElementById('modal-intro');
+    const introTitle = document.getElementById('intro-title');
+    const introStory = document.getElementById('intro-story');
+    const btnStartNight = document.getElementById('btn-start-night');
+
+    const modalResult = document.getElementById('modal-result');
+    const resultTitle = document.getElementById('result-title');
+    const resultDesc = document.getElementById('result-desc');
+    const resultScore = document.getElementById('result-score');
+    const btnNextNight = document.getElementById('btn-next-night');
+
+    const nightStories = {
+      1: { name: "Đêm 1 — Đảo Bến", text: '"Mây con, hãy thu thập những đốm sáng đom đóm trong đêm sương và thắp lại 5 Đèn Lồng Lớn trên Đảo Bến. Cẩn thận với Bóng Mực!" — Lời Ông Đăng' },
+      2: { name: "Đêm 2 — Đảo Cau", text: '"Cầu tre nối liền hai hòn đảo. Bùa Gió sẽ giúp con lướt không ngừng, nhưng hãy đề phòng Gió Lạc rình rập cướp ánh sáng!" — Lời Ông Đăng' },
+      3: { name: "Đêm 3 — Đảo Chuông", text: '"Đỉnh tháp chuông huyền ảo đón những cơn gió lớn từ biển mây. Hãy thắp sáng đủ 7 ngọn đèn để đón bình minh rực rỡ!" — Lời Ông Đăng' }
+    };
+
+    btnResume.addEventListener('click', () => {
+      game.engine.is_paused = false;
+      game.engine.state = 'playing';
+      modalPause.style.display = 'none';
     });
+
+    btnRestartNight.addEventListener('click', () => {
+      modalPause.style.display = 'none';
+      game.restart(currentNight);
+    });
+
+    btnStartNight.addEventListener('click', () => {
+      modalIntro.style.display = 'none';
+    });
+
+    btnNextNight.addEventListener('click', () => {
+      modalResult.style.display = 'none';
+      if (game.engine.state === 'won') {
+        if (currentNight < 3) {
+          currentNight += 1;
+          showIntro(currentNight);
+          game.restart(currentNight);
+        } else {
+          // Final Dawn Screen
+          resultTitle.innerText = "Bình Minh Đảo Đèn Lồng!";
+          resultDesc.innerText = `Chúc mừng bạn đã hoàn thành trọn vẹn cả 3 Đêm! Sương đen đã hoàn toàn tan biến.`;
+          resultScore.innerText = `Tổng Điểm Xuất Sắc: ${totalScore + game.engine.score} pts`;
+          btnNextNight.innerText = "Chơi Lại Từ Đầu";
+          currentNight = 1;
+          totalScore = 0;
+          modalResult.style.display = 'flex';
+        }
+      } else {
+        // Retry night
+        game.restart(currentNight);
+      }
+    });
+
+    function showIntro(night) {
+      introTitle.innerText = nightStories[night].name;
+      introStory.innerText = nightStories[night].text;
+      modalIntro.style.display = 'flex';
+    }
 
     // Sync HUD with engine state
     setInterval(() => {
       if (!game || !game.engine) return;
+      const eng = game.engine;
 
-      const engine = game.engine;
       // Flames
-      let flameText = '';
-      for (let i = 0; i < engine.player.flames; i++) flameText += '🔥';
-      if (engine.player.flames === 0) flameText = '💀';
-      elFlames.innerHTML = `<span class="flames-icon">${flameText}</span>`;
+      let fStr = '';
+      for (let i = 0; i < eng.player.flames; i++) fStr += '🔥';
+      if (eng.player.flames <= 0) fStr = '💀';
+      elFlames.innerText = fStr;
 
-      // Carried
-      elCarried.innerHTML = `<span>🏮 ${engine.player.carried} / ${engine.tuning.carry_capacity}</span>`;
+      // Timer mm:ss
+      const secTotal = Math.max(0, Math.ceil(eng.time_left_s));
+      const mm = String(Math.floor(secTotal / 60)).padStart(2, '0');
+      const ss = String(secTotal % 60).padStart(2, '0');
+      elTimer.innerText = `${mm}:${ss}`;
+      if (secTotal <= 30) {
+        timerBox.className = 'hud-box urgent';
+      } else {
+        timerBox.className = 'hud-box';
+      }
 
-      // Lanterns
-      const litCount = engine.lanterns.filter(l => l.lit).length;
-      elLanterns.innerHTML = `<span>${litCount} / ${engine.lanterns.length}</span>`;
+      // Night & Lanterns
+      elNightName.innerText = nightStories[currentNight].name;
+      const lit = eng.lanterns.filter(l => l.lit).length;
+      elLanterns.innerText = `Đèn: ${lit} / ${eng.lanterns.length}`;
+      elScore.innerText = `${totalScore + eng.score} pts`;
 
-      // Time & Score
-      elTime.innerText = `${Math.ceil(engine.time_left_s)}s`;
-      elScore.innerText = `${engine.score} pts`;
-
-      // Game Over check
-      if (engine.state !== 'playing' && modalOverlay.style.display !== 'flex') {
-        modalOverlay.style.display = 'flex';
-        modalScore.innerText = `Tổng Điểm: ${engine.score}`;
-        if (engine.state === 'won') {
-          modalTitle.className = 'modal-title won';
-          modalTitle.innerText = 'Chiến Thắng!';
-          modalDesc.innerText = 'Tất cả Đèn Lồng Lớn đã bừng sáng, xua tan sương đen trên Đảo Bến!';
+      // 10 Mote slots
+      moteSlots.forEach((slot, idx) => {
+        if (idx < eng.player.carried) {
+          slot.classList.add('filled');
         } else {
-          modalTitle.className = 'modal-title lost';
-          modalTitle.innerText = 'Trò Chơi Kết Thúc';
-          if (engine.player.flames <= 0) {
-            modalDesc.innerText = 'Mây đã bị Bóng Mực dập tắt hết ngọn lửa sinh mệnh.';
-          } else {
-            modalDesc.innerText = 'Bình minh đã đến trước khi bạn kịp thắp sáng các ngọn đèn.';
+          slot.classList.remove('filled');
+        }
+      });
+
+      // Cooldowns
+      const dashCd = eng.player.dash_cd_timer / 60;
+      if (dashCd <= 0 || eng.player.charm_timer > 0) {
+        cdDash.classList.add('ready');
+        cdDashVal.innerText = eng.player.charm_timer > 0 ? 'Bùa Gió (0s)' : 'Sẵn sàng';
+      } else {
+        cdDash.classList.remove('ready');
+        cdDashVal.innerText = `${dashCd.toFixed(1)}s`;
+      }
+
+      const pulseCd = eng.player.pulse_cd_timer / 60;
+      if (pulseCd <= 0) {
+        cdPulse.classList.add('ready');
+        cdPulseVal.innerText = eng.player.carried >= 3 ? 'Sẵn sàng' : 'Cần ≥3 đom đóm';
+      } else {
+        cdPulse.classList.remove('ready');
+        cdPulseVal.innerText = `${pulseCd.toFixed(1)}s`;
+      }
+
+      // Proximity check for interact prompt
+      let nearLantern = null;
+      for (const l of eng.lanterns) {
+        if (!l.lit) {
+          const d = Math.hypot(eng.player.pos[0] - l.pos[0], eng.player.pos[2] - l.pos[2]);
+          if (d <= eng.tuning.interact_radius) {
+            nearLantern = l;
+            break;
           }
+        }
+      }
+      if (nearLantern) {
+        elPrompt.innerText = `E — Nạp ánh sáng (${nearLantern.deposited}/${eng.tuning.lantern_cost})`;
+        elPrompt.style.display = 'block';
+      } else {
+        elPrompt.style.display = 'none';
+      }
+
+      // Pause Modal sync
+      if (eng.is_paused && modalPause.style.display !== 'flex') {
+        modalPause.style.display = 'flex';
+      }
+
+      // Game Over / Win sync
+      if ((eng.state === 'won' || eng.state === 'lost') && modalResult.style.display !== 'flex') {
+        modalResult.style.display = 'flex';
+        resultScore.innerText = `Điểm Đêm Này: ${eng.score} pts`;
+        if (eng.state === 'won') {
+          resultTitle.innerText = "Thành Công!";
+          resultDesc.innerText = `Đã thắp sáng toàn bộ ngọn đèn của ${nightStories[currentNight].name}!`;
+          btnNextNight.innerText = currentNight < 3 ? "Sang Đêm Kế Tiếp" : "Xem Tổng Kết Bình Minh";
+        } else {
+          resultTitle.innerText = "Chưa Hoàn Thành";
+          resultDesc.innerText = eng.player.flames <= 0
+            ? "Mây đã bị dập tắt hết ngọn lửa sinh mệnh."
+            : "Bình minh đã đến trước khi bạn kịp thắp sáng các ngọn đèn.";
+          btnNextNight.innerText = "Chơi Lại Đêm Này";
         }
       }
     }, 100);
