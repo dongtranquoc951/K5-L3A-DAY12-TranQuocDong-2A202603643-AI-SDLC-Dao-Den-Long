@@ -1,6 +1,10 @@
 import { DEFAULT_TUNING, NIGHT1_MAP, NIGHT2_MAP, NIGHT3_MAP } from './config.js';
 import { PRNG } from './prng.js';
 
+export function round1(val) {
+  return Math.round((Number(val) + Number.EPSILON) * 10) / 10;
+}
+
 export function round3(val) {
   return Math.round((Number(val) + Number.EPSILON) * 1000) / 1000;
 }
@@ -46,6 +50,8 @@ export class IslandEngine {
       grounded: true,
       flames: this.tuning.flames,
       carried: 0,
+      capacity: 10,
+      successful_lights: 0,
       invuln_timer: 0,
       dash_timer: 0,
       dash_dir: [0.0, 1.0],
@@ -69,7 +75,7 @@ export class IslandEngine {
     this.prevInput = { ...this.currentInput };
 
     // Wind system
-    this.wind = { active: false, dir_deg: 0.0, timer: 0 };
+    this.wind = { active: false, dir_deg: 0.0 };
     this.wind_enabled = (this.night === 3);
 
     // Map configuration
@@ -100,23 +106,32 @@ export class IslandEngine {
   }
 
   initMapData() {
+    const makeLantern = (l) => ({
+      ...l,
+      pos: [...l.pos],
+      lit: Boolean(l.lit),
+      deposited: l.deposited || 0,
+      fuel: l.lit ? 100.0 : 0.0,
+      ever_lit: Boolean(l.ever_lit),
+      relit_count: 0
+    });
+
     if (this.night === 1) {
       this.map = NIGHT1_MAP;
-      this.lanterns = NIGHT1_MAP.lanterns.map(l => ({ ...l, pos: [...l.pos] }));
+      this.lanterns = NIGHT1_MAP.lanterns.map(makeLantern);
       this.charms = [];
     } else if (this.night === 2) {
       this.map = NIGHT2_MAP;
-      this.lanterns = NIGHT2_MAP.lanterns.map(l => ({ ...l, pos: [...l.pos] }));
+      this.lanterns = NIGHT2_MAP.lanterns.map(makeLantern);
       this.charms = NIGHT2_MAP.charms.map(c => ({ ...c, pos: [...c.pos] }));
     } else {
       this.map = NIGHT3_MAP;
-      this.lanterns = NIGHT3_MAP.lanterns.map(l => ({ ...l, pos: [...l.pos] }));
+      this.lanterns = NIGHT3_MAP.lanterns.map(makeLantern);
       this.charms = NIGHT3_MAP.charms.map(c => ({ ...c, pos: [...c.pos] }));
     }
   }
 
   initDefaultEntities() {
-    // Initial 20 motes on random available spawn points
     const spawnPoints = this.map.mote_spawn_points;
     const shuffled = [...spawnPoints].sort(() => this.prng.next() - 0.5);
     const count = Math.min(20, shuffled.length);
@@ -128,9 +143,6 @@ export class IslandEngine {
         ttl: 0
       });
     }
-
-    // Charms are already in this.charms
-    // Shades and Drifters spawn via schedule
   }
 
   applyScenario(scenario) {
@@ -155,6 +167,10 @@ export class IslandEngine {
       if (p.grounded !== undefined) this.player.grounded = Boolean(p.grounded);
       if (p.carried !== undefined) this.player.carried = p.carried;
       if (p.flames !== undefined) this.player.flames = p.flames;
+      if (p.successful_lights !== undefined) {
+        this.player.successful_lights = p.successful_lights;
+        this.player.capacity = Math.min(20, 10 + 2 * this.player.successful_lights);
+      }
       if (p.invuln_ticks !== undefined) this.player.invuln_timer = p.invuln_ticks;
       if (p.dash_cd_ticks !== undefined) this.player.dash_cd_timer = p.dash_cd_ticks;
       if (p.pulse_cd_ticks !== undefined) this.player.pulse_cd_timer = p.pulse_cd_ticks;
@@ -167,18 +183,32 @@ export class IslandEngine {
 
     if (scenario.lanterns && Array.isArray(scenario.lanterns)) {
       for (const item of scenario.lanterns) {
-        const existing = this.lanterns.find(l => l.id === item.id);
-        if (existing) {
-          if (item.pos) existing.pos = [...item.pos];
-          if (item.lit !== undefined) existing.lit = Boolean(item.lit);
-          if (item.deposited !== undefined) existing.deposited = item.deposited;
-        } else {
-          this.lanterns.push({
+        let existing = this.lanterns.find(l => l.id === item.id);
+        if (!existing) {
+          existing = {
             id: item.id,
             pos: item.pos ? [...item.pos] : [0, 0, 0],
-            lit: Boolean(item.lit),
-            deposited: item.deposited || 0
-          });
+            lit: false,
+            deposited: 0,
+            fuel: 0.0,
+            ever_lit: false,
+            relit_count: 0
+          };
+          this.lanterns.push(existing);
+        }
+
+        if (item.pos) existing.pos = [...item.pos];
+        if (item.lit !== undefined) existing.lit = Boolean(item.lit);
+        if (item.ever_lit !== undefined) existing.ever_lit = Boolean(item.ever_lit);
+        if (item.relit_count !== undefined) existing.relit_count = item.relit_count;
+        if (item.deposited !== undefined) existing.deposited = item.deposited;
+
+        if (item.fuel !== undefined) {
+          existing.fuel = Number(item.fuel);
+        } else if (existing.lit) {
+          existing.fuel = 100.0;
+        } else {
+          existing.fuel = 0.0;
         }
       }
     }
@@ -204,7 +234,10 @@ export class IslandEngine {
         pos: [...s.pos],
         state: s.state || 'wander',
         state_ticks_left: s.state_ticks_left || 0,
-        recoil_dir: [0, 0]
+        target_lantern_id: s.target_lantern_id || null,
+        recoil_dir: [0, 0],
+        push_ticks_left: 0,
+        push_dir: [0, 0]
       }));
       this.shadeIdCounter = this.shades.length + 1;
     }
@@ -246,7 +279,6 @@ export class IslandEngine {
       if (dA <= 28.0) return 0.0;
       const dB = Math.hypot(x - 70.0, z);
       if (dB <= 28.0) return 0.0;
-      // Bridge: x in [26, 44], z in [-2, 2]
       if (x >= 26.0 && x <= 44.0 && z >= -2.0 && z <= 2.0) return 0.0;
       return -999.0;
     }
@@ -254,33 +286,23 @@ export class IslandEngine {
     if (this.night === 3) {
       const r = Math.hypot(x, z);
       if (r > 45.0) return -999.0;
-
-      // Bell tower cylinder check (R <= 2 on Tier 2): impassable
       if (r <= 2.0) return 6.0;
-
-      // Tier 2: R <= 8m
       if (r <= 8.0) return 6.0;
 
-      // Check ramps at 30 deg and 150 deg (width 3m, R in [24, 30], slopes 0 -> 3)
       for (const rampAngle of [30, 150]) {
         const rad = (rampAngle * Math.PI) / 180.0;
         const rampDirX = Math.cos(rad);
         const rampDirZ = Math.sin(rad);
-        // Project (x, z) along ramp direction and perpendicular
         const projAlong = x * rampDirX + z * rampDirZ;
         const projPerp = Math.abs(-x * rampDirZ + z * rampDirX);
 
         if (projPerp <= 1.5 && projAlong >= 24.0 && projAlong <= 30.0) {
-          // Linear height from 0 at R=30 to 3 at R=24
           const t = (30.0 - projAlong) / 6.0;
           return t * 3.0;
         }
       }
 
-      // Tier 1: Annulus R in [12, 24] on z > 0
       if (r >= 12.0 && r <= 24.0 && z > 0.0) return 3.0;
-
-      // Tier 0: Ground level
       return 0.0;
     }
 
@@ -324,7 +346,7 @@ export class IslandEngine {
       return this.events;
     }
 
-    // 2. Decrement Counters
+    // 2. Decrement Counters & Fuel Processing
     this.sim_tick += 1;
     this.time_left_s = Math.max(0, this.duration_s - (this.sim_tick / 60.0));
 
@@ -338,9 +360,7 @@ export class IslandEngine {
     for (const c of this.charms) {
       if (!c.available) {
         c.respawn_timer -= 1;
-        if (c.respawn_timer <= 0) {
-          c.available = true;
-        }
+        if (c.respawn_timer <= 0) c.available = true;
       }
     }
 
@@ -349,9 +369,7 @@ export class IslandEngine {
       const m = this.motes[i];
       if (m.kind === 'dropped') {
         m.ttl -= 1;
-        if (m.ttl <= 0) {
-          this.motes.splice(i, 1);
-        }
+        if (m.ttl <= 0) this.motes.splice(i, 1);
       }
     }
 
@@ -359,7 +377,6 @@ export class IslandEngine {
     if (this.player.fall_respawn_timer > 0) {
       this.player.fall_respawn_timer -= 1;
       if (this.player.fall_respawn_timer <= 0) {
-        // Respawn
         this.player.pos = [0.0, 0.0, 0.0];
         this.player.vel = [0.0, 0.0, 0.0];
         this.player.grounded = true;
@@ -369,10 +386,56 @@ export class IslandEngine {
       return this.events;
     }
 
+    // Fuel Decay & Shade Drain (Ticket-03)
+    const dt = 1 / 60.0;
+    for (const lantern of this.lanterns) {
+      if (lantern.lit) {
+        // Natural decay: 1.0 unit/second
+        let drainAmount = this.tuning.fuel_decay_per_s * dt;
+
+        // Count shades currently draining this lantern
+        for (const shade of this.shades) {
+          if (shade.state === 'drain' && shade.target_lantern_id === lantern.id) {
+            drainAmount += this.tuning.drain_per_s * dt;
+
+            // Log fuel_drain event every 60 ticks while draining
+            if (this.sim_tick % 60 === 0) {
+              this.events.push({
+                type: 'event',
+                tick: stepTick,
+                name: 'fuel_drain',
+                data: {
+                  lantern_id: lantern.id,
+                  shade_id: shade.id,
+                  fuel: round1(Math.max(0, lantern.fuel - drainAmount))
+                }
+              });
+            }
+          }
+        }
+
+        lantern.fuel = Math.max(0, lantern.fuel - drainAmount);
+
+        // Out of fuel check
+        if (lantern.fuel <= 0.0) {
+          lantern.fuel = 0.0;
+          lantern.lit = false;
+          lantern.deposited = 0;
+          lantern.ever_lit = true;
+          this.events.push({
+            type: 'event',
+            tick: stepTick,
+            name: 'lantern_out',
+            data: { lantern_id: lantern.id }
+          });
+        }
+      }
+    }
+
     // Wind logic for Night 3
     if (this.wind_enabled) {
-      const windCycle = this.sim_tick % 1800; // 30s cycle
-      if (windCycle >= 1500) { // 5s active (1500 to 1800)
+      const windCycle = this.sim_tick % 1800;
+      if (windCycle >= 1500) {
         this.wind.active = true;
         if (windCycle === 1500) {
           this.wind.dir_deg = this.prng.nextFloat(0, 360);
@@ -407,10 +470,9 @@ export class IslandEngine {
     const dashEdge = Boolean(this.currentInput.dash && !this.prevInput.dash);
     const hasCharm = this.player.charm_timer > 0;
     if (dashEdge && this.player.dash_timer <= 0 && (this.player.dash_cd_timer <= 0 || hasCharm)) {
-      this.player.dash_timer = 12; // 0.2s = 12 ticks
-      this.player.dash_cd_timer = hasCharm ? 0 : 90; // 1.5s = 90 ticks
+      this.player.dash_timer = 12;
+      this.player.dash_cd_timer = hasCharm ? 0 : 90;
 
-      // Dash direction
       if (moveLen > 0) {
         this.player.dash_dir = [worldMoveX, worldMoveZ];
       } else {
@@ -433,16 +495,12 @@ export class IslandEngine {
       this.player.grounded = false;
     }
 
-    // Determine horizontal movement
     const baseSpeed = hasCharm ? 7.2 : this.tuning.player_speed;
-    const dt = 1 / 60.0;
-
     const prevX = this.player.pos[0];
     const prevY = this.player.pos[1];
     const prevZ = this.player.pos[2];
 
     if (this.player.dash_timer > 0) {
-      // Dashing: 14 m/s in dash_dir, maintain Y altitude in air
       this.player.vel[0] = this.player.dash_dir[0] * this.tuning.dash_speed;
       this.player.vel[2] = this.player.dash_dir[1] * this.tuning.dash_speed;
       this.player.vel[1] = 0.0;
@@ -450,7 +508,6 @@ export class IslandEngine {
       this.player.pos[2] += this.player.vel[2] * dt;
     } else {
       if (this.player.launch_active) {
-        // Preserves launch horizontal velocity
         this.player.pos[0] += this.player.vel[0] * dt;
         this.player.pos[2] += this.player.vel[2] * dt;
       } else {
@@ -460,26 +517,22 @@ export class IslandEngine {
         this.player.pos[2] += this.player.vel[2] * dt;
       }
 
-      // Wind push in Night 3
       if (this.wind.active) {
         const windRad = (this.wind.dir_deg * Math.PI) / 180.0;
         this.player.pos[0] += Math.cos(windRad) * (2.0 * dt);
         this.player.pos[2] += Math.sin(windRad) * (2.0 * dt);
       }
 
-      // Gravity
       if (!this.player.grounded) {
         this.player.vel[1] += this.tuning.gravity * dt;
         this.player.pos[1] += this.player.vel[1] * dt;
       }
     }
 
-    // Ground & Cliff Collision Check
+    // Ground & Cliff Collision
     const groundY = this.getGroundHeight(this.player.pos[0], this.player.pos[2]);
     if (groundY > -500.0) {
-      // Cliff check in Night 3: vertical walls prevent stepping up higher than 0.5m without ramp
       if (groundY > prevY + 0.6 && this.night === 3 && !this.player.launch_active && this.player.pos[1] < groundY) {
-        // Block horizontal movement into high cliff
         this.player.pos[0] = prevX;
         this.player.pos[2] = prevZ;
         this.player.vel[0] = 0.0;
@@ -490,18 +543,16 @@ export class IslandEngine {
         this.player.grounded = true;
         this.player.launch_active = false;
       } else if (this.player.grounded && Math.abs(this.player.pos[1] - groundY) <= 0.4) {
-        // Smooth snap to ground slope when walking
         this.player.pos[1] = groundY;
         this.player.vel[1] = 0.0;
       } else {
         this.player.grounded = false;
       }
     } else {
-      // In air / falling
       this.player.grounded = false;
     }
 
-    // Check Launch Pads (Night 2 and Night 3)
+    // Launch Pads
     if (this.map.launchPads && this.player.grounded) {
       for (const pad of this.map.launchPads) {
         if (distXZ(this.player.pos, pad.pos) <= pad.radius) {
@@ -524,7 +575,7 @@ export class IslandEngine {
       }
     }
 
-    // Check Fall off island (Y < -10)
+    // Fall off island (Y < -10)
     if (this.player.pos[1] < -10.0) {
       const lostMotes = this.player.carried;
       this.player.carried = 0;
@@ -555,14 +606,13 @@ export class IslandEngine {
     }
 
     // 4. Pickup Motes & Charms
-    // Charms
     for (const c of this.charms) {
       if (c.available && distXZ(this.player.pos, c.pos) <= this.tuning.pickup_radius) {
         const dy = Math.abs(this.player.pos[1] - c.pos[1]);
         if (dy <= this.tuning.pickup_height_max) {
           c.available = false;
-          c.respawn_timer = 2700; // 45s
-          this.player.charm_timer = 600; // 10s
+          c.respawn_timer = 2700;
+          this.player.charm_timer = 600;
           this.events.push({
             type: 'event',
             tick: stepTick,
@@ -573,8 +623,7 @@ export class IslandEngine {
       }
     }
 
-    // Motes
-    if (this.player.carried < this.tuning.carry_capacity) {
+    if (this.player.carried < this.player.capacity) {
       for (let i = this.motes.length - 1; i >= 0; i--) {
         const m = this.motes[i];
         if (distXZ(this.player.pos, m.pos) <= this.tuning.pickup_radius) {
@@ -588,19 +637,22 @@ export class IslandEngine {
               name: 'mote_picked',
               data: { carried: this.player.carried }
             });
-            if (this.player.carried >= this.tuning.carry_capacity) break;
+            if (this.player.carried >= this.player.capacity) break;
           }
         }
       }
     }
 
-    // 5. Interact with Lanterns
+    // 5. Interact with Lanterns (Light / Relight / Refuel)
     const interactEdge = Boolean(this.currentInput.interact && !this.prevInput.interact);
     if (interactEdge && this.player.carried > 0) {
+      // Find eligible lanterns: unlit OR (lit and fuel < 100)
       let targetLantern = null;
       let minDist = Infinity;
+
       for (const lantern of this.lanterns) {
-        if (!lantern.lit) {
+        const canAccept = !lantern.lit || (lantern.lit && lantern.fuel < 100.0);
+        if (canAccept) {
           const d = distXZ(this.player.pos, lantern.pos);
           if (d <= this.tuning.interact_radius) {
             if (d < minDist || (Math.abs(d - minDist) < 0.001 && lantern.id < targetLantern.id)) {
@@ -612,48 +664,85 @@ export class IslandEngine {
       }
 
       if (targetLantern) {
-        const needed = this.tuning.lantern_cost - targetLantern.deposited;
-        const depositAmount = Math.min(this.player.carried, needed);
-        this.player.carried -= depositAmount;
-        targetLantern.deposited += depositAmount;
-        this.score += depositAmount * this.tuning.score.per_mote;
+        if (!targetLantern.lit) {
+          // Case A: Lighting or Relighting
+          const cost = targetLantern.ever_lit ? this.tuning.relight_cost : this.tuning.lantern_cost;
+          const needed = cost - targetLantern.deposited;
+          const depositAmount = Math.min(this.player.carried, needed);
 
-        this.events.push({
-          type: 'event',
-          tick: stepTick,
-          name: 'deposit',
-          data: {
-            lantern_id: targetLantern.id,
-            amount: depositAmount,
-            deposited: targetLantern.deposited
-          }
-        });
+          this.player.carried -= depositAmount;
+          targetLantern.deposited += depositAmount;
+          this.score += depositAmount * this.tuning.score.per_mote_deposited;
 
-        if (targetLantern.deposited >= this.tuning.lantern_cost) {
-          targetLantern.lit = true;
-          this.score += this.tuning.score.per_lantern;
           this.events.push({
             type: 'event',
             tick: stepTick,
-            name: 'lantern_lit',
-            data: { lantern_id: targetLantern.id }
+            name: 'deposit',
+            data: {
+              lantern_id: targetLantern.id,
+              amount: depositAmount,
+              deposited: targetLantern.deposited
+            }
           });
 
-          // Check if all lanterns lit
-          const allLit = this.lanterns.every(l => l.lit);
-          if (allLit) {
-            this.state = 'won';
-            const secondsLeft = Math.max(0, Math.floor(this.time_left_s));
-            this.score += secondsLeft * this.tuning.score.per_second_left;
-            this.score += this.player.flames * this.tuning.score.per_flame_left;
+          if (targetLantern.deposited >= cost) {
+            const isRelight = Boolean(targetLantern.ever_lit);
+            targetLantern.lit = true;
+            targetLantern.fuel = 100.0;
+            targetLantern.ever_lit = true;
+
+            if (isRelight) {
+              targetLantern.relit_count += 1;
+              this.score += this.tuning.score.per_relight;
+            } else {
+              this.score += this.tuning.score.per_first_light;
+            }
+
+            this.player.successful_lights += 1;
+            this.player.capacity = Math.min(this.tuning.capacity_max, 10 + 2 * this.player.successful_lights);
+
             this.events.push({
               type: 'event',
               tick: stepTick,
-              name: 'game_over',
-              data: { result: 'won', reason: 'all_lit' }
+              name: 'lantern_lit',
+              data: { lantern_id: targetLantern.id, relight: isRelight }
             });
-            this.tick = stepTick;
-            return this.events;
+          }
+        } else {
+          // Case B: Refuel (Châm dầu)
+          const neededMotes = Math.ceil((100.0 - targetLantern.fuel) / this.tuning.fuel_per_mote);
+          const used = Math.min(this.player.carried, neededMotes);
+
+          if (used > 0) {
+            this.player.carried -= used;
+            targetLantern.fuel = Math.min(100.0, targetLantern.fuel + used * this.tuning.fuel_per_mote);
+            this.score += used * this.tuning.score.per_mote_deposited;
+
+            this.events.push({
+              type: 'event',
+              tick: stepTick,
+              name: 'refuel',
+              data: {
+                lantern_id: targetLantern.id,
+                amount: used,
+                fuel: round1(targetLantern.fuel)
+              }
+            });
+
+            // Push shades out if refueled to >= 30
+            if (targetLantern.fuel >= this.tuning.low_fuel_threshold) {
+              for (const shade of this.shades) {
+                if (distXZ(shade.pos, targetLantern.pos) < this.tuning.safe_radius) {
+                  const dx = shade.pos[0] - targetLantern.pos[0];
+                  const dz = shade.pos[2] - targetLantern.pos[2];
+                  const dist = Math.hypot(dx, dz);
+                  if (dist > 0.001) {
+                    shade.pos[0] = targetLantern.pos[0] + (dx / dist) * this.tuning.safe_radius;
+                    shade.pos[2] = targetLantern.pos[2] + (dz / dist) * this.tuning.safe_radius;
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -662,7 +751,7 @@ export class IslandEngine {
     // 6. Update Safe Zones
     for (const shade of this.shades) {
       for (const lantern of this.lanterns) {
-        if (lantern.lit) {
+        if (lantern.lit && lantern.fuel >= this.tuning.low_fuel_threshold) {
           const d = distXZ(shade.pos, lantern.pos);
           if (d < this.tuning.safe_radius) {
             const dx = shade.pos[0] - lantern.pos[0];
@@ -691,8 +780,9 @@ export class IslandEngine {
       for (const shade of this.shades) {
         const d3d = dist3D(pulseCenter, shade.pos);
         if (d3d <= this.tuning.pulse_radius) {
+          const wasDraining = (shade.state === 'drain');
           shade.state = 'stunned';
-          shade.state_ticks_left = 120; // 2s
+          shade.state_ticks_left = 120;
           shade.push_ticks_left = 15;
 
           const dx = shade.pos[0] - this.player.pos[0];
@@ -700,19 +790,18 @@ export class IslandEngine {
           const dist = Math.hypot(dx, dz);
           shade.push_dir = dist > 0.001 ? [dx / dist, dz / dist] : [1.0, 0.0];
 
-          this.score += this.tuning.score.per_stun;
+          // Score: +15 if was draining, else +5
+          this.score += wasDraining ? this.tuning.score.per_stun_drain : this.tuning.score.per_stun;
           stunnedIds.push(shade.id);
         }
       }
 
-      // Check Drifters hit by Pulse
       for (const d of this.drifters) {
         if (dist3D(pulseCenter, d.pos) <= this.tuning.pulse_radius) {
           if (d.state === 'chase') {
             d.state = 'flee';
             d.flee_timer = 240;
           } else if (d.state === 'flee' && d.stolen > 0) {
-            // Drop all stolen motes
             for (let i = 0; i < d.stolen; i++) {
               this.motes.push({
                 id: `M${this.moteIdCounter++}`,
@@ -728,7 +817,7 @@ export class IslandEngine {
               data: { drifter_id: d.id, amount: d.stolen }
             });
             d.stolen = 0;
-            d.flee_timer = 120; // disappear after 120 ticks
+            d.flee_timer = 120;
           }
         }
       }
@@ -755,6 +844,19 @@ export class IslandEngine {
         if (shade.state_ticks_left <= 0) {
           shade.state = 'wander';
         }
+      } else if (shade.state === 'drain') {
+        // Transition from drain:
+        // 1) chase if Mây within 6m
+        if (distXZ(shade.pos, this.player.pos) <= 6.0) {
+          shade.state = 'chase';
+        } else {
+          // Check target lantern
+          const target = this.lanterns.find(l => l.id === shade.target_lantern_id);
+          if (!target || !target.lit || target.fuel >= this.tuning.low_fuel_threshold || distXZ(shade.pos, target.pos) > 2.0) {
+            shade.state = 'wander';
+            shade.target_lantern_id = null;
+          }
+        }
       } else if (shade.state === 'recoil') {
         shade.state_ticks_left -= 1;
         shade.pos[0] += shade.recoil_dir[0] * (2.0 / 60.0);
@@ -773,9 +875,52 @@ export class IslandEngine {
           shade.pos[2] += (dz / dist) * shadeSpeed;
         }
       } else if (shade.state === 'wander' || shade.state === 'spawning') {
-        const d = distXZ(shade.pos, this.player.pos);
-        if (d <= this.tuning.shade_detect_radius) {
+        const dPlayer = distXZ(shade.pos, this.player.pos);
+        if (dPlayer <= this.tuning.shade_detect_radius) {
           shade.state = 'chase';
+        } else {
+          // In wander: seek weak lit lantern (fuel < 30) or unlit lantern
+          let target = null;
+          let minDist = Infinity;
+
+          // Prefer lit lanterns with fuel < 30
+          for (const l of this.lanterns) {
+            if (l.lit && l.fuel < this.tuning.low_fuel_threshold) {
+              const d = distXZ(shade.pos, l.pos);
+              if (d < minDist || (Math.abs(d - minDist) < 0.001 && l.id < target?.id)) {
+                minDist = d;
+                target = l;
+              }
+            }
+          }
+
+          // If no weak lit lantern, move towards closest unlit lantern
+          if (!target) {
+            minDist = Infinity;
+            for (const l of this.lanterns) {
+              if (!l.lit) {
+                const d = distXZ(shade.pos, l.pos);
+                if (d < minDist || (Math.abs(d - minDist) < 0.001 && l.id < target?.id)) {
+                  minDist = d;
+                  target = l;
+                }
+              }
+            }
+          }
+
+          if (target) {
+            shade.target_lantern_id = target.id;
+            const dx = target.pos[0] - shade.pos[0];
+            const dz = target.pos[2] - shade.pos[2];
+            const d = Math.hypot(dx, dz);
+
+            if (target.lit && target.fuel < this.tuning.low_fuel_threshold && d <= 2.0) {
+              shade.state = 'drain';
+            } else if (d > 0.001) {
+              shade.pos[0] += (dx / d) * shadeSpeed;
+              shade.pos[2] += (dz / d) * shadeSpeed;
+            }
+          }
         }
       }
     }
@@ -813,8 +958,7 @@ export class IslandEngine {
       }
     }
 
-    // 9. Contact / Touch (Gió Lạc steals first, then Shades inflict hit)
-    // Drifter contact
+    // 9. Contact (Gió Lạc steals first, then Shades inflict hit)
     for (const d of this.drifters) {
       if (d.state === 'chase' && distXZ(d.pos, this.player.pos) <= 1.2) {
         const stealAmount = Math.min(3, this.player.carried);
@@ -831,7 +975,6 @@ export class IslandEngine {
       }
     }
 
-    // Shade contact (sorted by increasing ID)
     const sortedShades = [...this.shades].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
     let flameLostThisTick = false;
 
@@ -847,7 +990,6 @@ export class IslandEngine {
             this.player.carried -= dropCount;
             this.player.invuln_timer = 90;
 
-            // Drop motes in ring 1.5-2.5m
             for (let i = 0; i < dropCount; i++) {
               const a = this.prng.nextFloat(0, Math.PI * 2);
               const r = this.prng.nextFloat(1.5, 2.5);
@@ -866,7 +1008,6 @@ export class IslandEngine {
               data: { by: 'shade', flames: this.player.flames, dropped: dropCount }
             });
 
-            // Shade recoil 2m over 60 ticks
             shade.state = 'recoil';
             shade.state_ticks_left = 60;
             const dx = shade.pos[0] - this.player.pos[0];
@@ -890,8 +1031,7 @@ export class IslandEngine {
       }
     }
 
-    // 10. Spawn motes, Shades, Drifters according to schedule
-    // Mote spawn every 240 ticks if < 30
+    // 10. Spawning Schedule
     if (this.random_motes && this.sim_tick % 240 === 0 && this.motes.length < 30) {
       const spawnPoints = this.map.mote_spawn_points;
       const occupied = new Set(this.motes.map(m => `${round3(m.pos[0])},${round3(m.pos[2])}`));
@@ -907,7 +1047,6 @@ export class IslandEngine {
       }
     }
 
-    // Shade spawn schedule
     if (this.random_shades) {
       const maxShades = this.night === 1 ? 6 : (this.night === 2 ? 8 : 10);
       const spawnInterval = this.night === 1 ? 480 : (this.night === 2 ? 420 : 360);
@@ -929,7 +1068,10 @@ export class IslandEngine {
               pos: [...pt],
               state: 'spawning',
               state_ticks_left: 60,
-              recoil_dir: [0, 0]
+              target_lantern_id: null,
+              recoil_dir: [0, 0],
+              push_ticks_left: 0,
+              push_dir: [0, 0]
             };
             this.shades.push(newShade);
             this.events.push({
@@ -943,7 +1085,6 @@ export class IslandEngine {
       }
     }
 
-    // Drifter spawn schedule (Nights 2 & 3 only)
     if (this.random_drifters && (this.night === 2 || this.night === 3)) {
       if (this.sim_tick % 1200 === 0 && this.drifters.length < 2) {
         const spawnPoints = this.map.shade_spawn_points;
@@ -958,15 +1099,42 @@ export class IslandEngine {
       }
     }
 
-    // 11. Win / Loss Check
-    if (this.time_left_s <= 0 && this.state === 'playing') {
+    // 11. Win / Loss Check (Ticket-03)
+    if (this.player.flames <= 0) {
       this.state = 'lost';
       this.events.push({
         type: 'event',
         tick: stepTick,
         name: 'game_over',
-        data: { result: 'lost', reason: 'dawn' }
+        data: { result: 'lost', reason: 'no_flames' }
       });
+    } else if (this.time_left_s <= 0 && this.state === 'playing') {
+      const litLanterns = this.lanterns.filter(l => l.lit);
+      const needed = Math.ceil(this.tuning.win_ratio * this.lanterns.length);
+
+      if (litLanterns.length >= needed) {
+        this.state = 'won';
+        // Scoring at dawn: +50 per lit lantern + floor(fuel) + 50 per remaining flame
+        for (const l of litLanterns) {
+          this.score += this.tuning.score.per_lit_lantern_base + Math.floor(l.fuel);
+        }
+        this.score += this.player.flames * this.tuning.score.per_flame_left;
+
+        this.events.push({
+          type: 'event',
+          tick: stepTick,
+          name: 'game_over',
+          data: { result: 'won', reason: 'dawn_survived' }
+        });
+      } else {
+        this.state = 'lost';
+        this.events.push({
+          type: 'event',
+          tick: stepTick,
+          name: 'game_over',
+          data: { result: 'lost', reason: 'dawn' }
+        });
+      }
     }
 
     this.tick = stepTick;
@@ -984,7 +1152,7 @@ export class IslandEngine {
       score: this.score,
       wind: {
         active: Boolean(this.wind.active),
-        dir_deg: round3(this.wind.dir_deg)
+        dir_deg: round3(this.wind.dir_deg || 0.0)
       },
       player: {
         pos: [round3(this.player.pos[0]), round3(this.player.pos[1]), round3(this.player.pos[2])],
@@ -992,6 +1160,7 @@ export class IslandEngine {
         grounded: this.player.grounded,
         flames: this.player.flames,
         carried: this.player.carried,
+        capacity: this.player.capacity,
         invuln: this.player.invuln_timer > 0,
         dash_cd_s: round3(Math.max(0, this.player.dash_cd_timer / 60.0)),
         pulse_cd_s: round3(Math.max(0, this.player.pulse_cd_timer / 60.0)),
@@ -1001,7 +1170,10 @@ export class IslandEngine {
         id: l.id,
         pos: [round3(l.pos[0]), round3(l.pos[1]), round3(l.pos[2])],
         lit: l.lit,
-        deposited: l.deposited
+        deposited: l.deposited,
+        fuel: l.lit ? round1(l.fuel) : 0.0,
+        ever_lit: Boolean(l.ever_lit),
+        relit_count: l.relit_count || 0
       })),
       shades: this.shades.map(s => ({
         id: s.id,

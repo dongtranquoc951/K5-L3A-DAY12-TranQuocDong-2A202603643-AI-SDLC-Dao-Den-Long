@@ -74,8 +74,8 @@ test('Scenario Deposit: Player deposits carried motes into lantern and lights it
   assert.equal(litEvent.data.lantern_id, 'L1');
 
   const endLine = lines[lines.length - 1];
-  // 10 motes deposited * 10 = 100, + 100 per lantern lit = 200
-  assert.equal(endLine.score, 200);
+  // Phase 3 scoring: 10 motes deposited * 5 = 50, + 100 per first light = 150
+  assert.equal(endLine.score, 150);
 });
 
 test('Scenario Pulse: Player pulses with >= 3 motes to stun and push nearby shade', () => {

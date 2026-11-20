@@ -301,8 +301,9 @@
   <!-- Interact Prompt -->
   <div id="interact-prompt">E — Nạp ánh sáng (x/10)</div>
 
-  <!-- HUD Bottom (10 Mote Slots & Controls Helper) -->
+  <!-- HUD Bottom (Dynamic Mote Slots & Controls Helper) -->
   <div id="hud-bottom">
+    <div id="mote-capacity-text" style="font-size: 13px; font-weight: bold; color: #fff6c2; text-shadow: 0 1px 4px #000;">Đom đóm: 0 / 10</div>
     <div id="mote-bar">
       <div class="mote-slot"></div><div class="mote-slot"></div>
       <div class="mote-slot"></div><div class="mote-slot"></div>
@@ -311,7 +312,7 @@
       <div class="mote-slot"></div><div class="mote-slot"></div>
     </div>
     <div style="font-size: 12px; color: #8fa3b8; text-shadow: 0 1px 4px #000;">
-      WASD: Di chuyển | Kéo chuột: Xoay Camera 3D | Shift: Lướt | Space: Nhảy | Q: Tỏa Sáng | E: Nạp Đèn
+      WASD: Di chuyển | Kéo chuột: Xoay Camera 3D | Shift: Lướt | Space: Nhảy | Q: Tỏa Sáng | E: Nạp/Châm Đèn
     </div>
   </div>
 
@@ -335,6 +336,10 @@
         <div class="settings-row">
           <label for="sens-slider">Độ nhạy chuột:</label>
           <input type="range" id="sens-slider" min="0.3" max="2.5" step="0.1" value="1.0">
+        </div>
+        <div class="settings-row">
+          <label for="cb-toggle">Chế độ mù màu (Trợ năng):</label>
+          <input type="checkbox" id="cb-toggle" style="width: 20px; height: 20px; cursor: pointer;">
         </div>
       </div>
 
@@ -393,6 +398,9 @@
     const btnRestartNight = document.getElementById('btn-restart-night');
     const volSlider = document.getElementById('vol-slider');
     const sensSlider = document.getElementById('sens-slider');
+    const cbToggle = document.getElementById('cb-toggle');
+    const elMoteCapacityText = document.getElementById('mote-capacity-text');
+    const moteBar = document.getElementById('mote-bar');
 
     const modalIntro = document.getElementById('modal-intro');
     const introTitle = document.getElementById('intro-title');
@@ -419,6 +427,13 @@
 
     sensSlider.addEventListener('input', e => {
       game.setSensitivity(parseFloat(e.target.value));
+    });
+
+    if (localStorage.getItem('dao_den_long_cb') === '1') {
+      cbToggle.checked = true;
+    }
+    cbToggle.addEventListener('change', e => {
+      game.setColorblindMode(e.target.checked);
     });
 
     const nightStories = {
@@ -499,14 +514,25 @@
       elLanterns.innerText = `Đèn: ${lit} / ${eng.lanterns.length}`;
       elScore.innerText = `${totalScore + eng.score} pts`;
 
-      // 10 Mote slots
-      moteSlots.forEach((slot, idx) => {
-        if (idx < eng.player.carried) {
-          slot.classList.add('filled');
+      // Progressive capacity and Mote slots
+      const cap = eng.player.capacity || 10;
+      elMoteCapacityText.innerText = `Đom đóm: ${eng.player.carried} / ${cap}`;
+
+      while (moteBar.children.length < cap) {
+        const slot = document.createElement('div');
+        slot.className = 'mote-slot';
+        moteBar.appendChild(slot);
+      }
+      while (moteBar.children.length > cap) {
+        moteBar.removeChild(moteBar.lastChild);
+      }
+      for (let i = 0; i < cap; i++) {
+        if (i < eng.player.carried) {
+          moteBar.children[i].classList.add('filled');
         } else {
-          slot.classList.remove('filled');
+          moteBar.children[i].classList.remove('filled');
         }
-      });
+      }
 
       // Cooldowns
       const dashCd = eng.player.dash_cd_timer / 60;
@@ -527,26 +553,34 @@
         cdPulseVal.innerText = `${pulseCd.toFixed(1)}s`;
       }
 
-      // Proximity check for interact prompt and nearest unlit lantern
-      let nearLantern = null;
+      // Proximity check for interact prompt (refuel or light)
+      let targetLantern = null;
       let nearestUnlit = null;
       let minDistUnlit = Infinity;
+      let minDistInteract = Infinity;
 
       for (const l of eng.lanterns) {
-        if (!l.lit) {
-          const d = Math.hypot(eng.player.pos[0] - l.pos[0], eng.player.pos[2] - l.pos[2]);
-          if (d <= eng.tuning.interact_radius && !nearLantern) {
-            nearLantern = l;
-          }
-          if (d < minDistUnlit) {
-            minDistUnlit = d;
-            nearestUnlit = l;
-          }
+        const d = Math.hypot(eng.player.pos[0] - l.pos[0], eng.player.pos[2] - l.pos[2]);
+        const canInteract = !l.lit || (l.lit && l.fuel < 100);
+
+        if (canInteract && d <= eng.tuning.interact_radius && d < minDistInteract) {
+          minDistInteract = d;
+          targetLantern = l;
+        }
+
+        if (!l.lit && d < minDistUnlit) {
+          minDistUnlit = d;
+          nearestUnlit = l;
         }
       }
 
-      if (nearLantern) {
-        elPrompt.innerText = `E — Nạp ánh sáng (${nearLantern.deposited}/${eng.tuning.lantern_cost})`;
+      if (targetLantern) {
+        if (!targetLantern.lit) {
+          const req = targetLantern.ever_lit ? 5 : 10;
+          elPrompt.innerText = `E — ${targetLantern.ever_lit ? 'Thắp lại đèn' : 'Nạp ánh sáng'} (${targetLantern.deposited}/${req})`;
+        } else {
+          elPrompt.innerText = `E — Châm dầu (Dầu: ${Math.floor(targetLantern.fuel)}/100)`;
+        }
         elPrompt.style.display = 'block';
       } else {
         elPrompt.style.display = 'none';
@@ -599,14 +633,14 @@
         modalResult.style.display = 'flex';
         resultScore.innerText = `Điểm Đêm Này: ${eng.score} pts`;
         if (eng.state === 'won') {
-          resultTitle.innerText = "Thành Công!";
-          resultDesc.innerText = `Đã thắp sáng toàn bộ ngọn đèn của ${nightStories[currentNight].name}!`;
-          btnNextNight.innerText = currentNight < 3 ? "Sang Đêm Kế Tiếp" : "Xem Tổng Kết Bình Minh";
+          resultTitle.innerText = "Bình Minh Đã Đến!";
+          resultDesc.innerText = `Bạn đã kiên cường bảo vệ ánh sáng qua đêm dài! Đảo đã bình yên đón bình minh.`;
+          btnNextNight.innerText = currentNight < 3 ? "Sang Đêm Kế Tiếp" : "Xem Tổng Kết Toàn Bộ";
         } else {
-          resultTitle.innerText = "Chưa Hoàn Thành";
+          resultTitle.innerText = "Chưa Vượt Qua Đêm";
           resultDesc.innerText = eng.player.flames <= 0
-            ? "Mây đã bị dập tắt hết ngọn lửa sinh mệnh."
-            : "Bình minh đã đến trước khi bạn kịp thắp sáng các ngọn đèn.";
+            ? "Mây đã bị dập tắt hết ngọn lửa sinh mệnh trước sương đen."
+            : "Bình minh đã đến nhưng số đèn còn sáng không đủ để xua tan màn sương (< 60%).";
           btnNextNight.innerText = "Chơi Lại Đêm Này";
         }
       }

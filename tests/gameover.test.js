@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { runHeadless } from '../src/headless.js';
 
-test('Win Condition: Lighting all 5 lanterns triggers game_over won all_lit', () => {
-  // Ticket-02 requires 10 motes per lantern
+test('Win Condition: Surviving until dawn with >= 60% lit lanterns triggers game_over won dawn_survived', () => {
+  // Phase 3 Contract v1.2: Win is checked when time expires (dawn).
+  // Night 1 has 5 lanterns, ceil(0.6 * 5) = 3 lit lanterns required to survive.
   const scenario = {
     player: { pos: [0, 0, 1.0], carried: 10, flames: 3 },
     random_motes: false,
@@ -13,12 +14,12 @@ test('Win Condition: Lighting all 5 lanterns triggers game_over won all_lit', ()
     shades: [],
     lanterns: [
       { id: "L1", pos: [0, 0, 2.0], deposited: 0, lit: false },
-      { id: "L2", pos: [10, 0, 10], deposited: 10, lit: true },
-      { id: "L3", pos: [10, 0, -10], deposited: 10, lit: true },
-      { id: "L4", pos: [-10, 0, -10], deposited: 10, lit: true },
-      { id: "L5", pos: [-10, 0, 10], deposited: 10, lit: true }
+      { id: "L2", pos: [10, 0, 10], deposited: 10, lit: true, fuel: 80 },
+      { id: "L3", pos: [10, 0, -10], deposited: 10, lit: true, fuel: 80 },
+      { id: "L4", pos: [-10, 0, -10], deposited: 10, lit: true, fuel: 80 },
+      { id: "L5", pos: [-10, 0, 10], deposited: 0, lit: false }
     ],
-    time_left_s: 100
+    time_left_s: 0.1 // 6 ticks to dawn
   };
 
   const scenPath = 'tests/scen_win.json';
@@ -41,12 +42,14 @@ test('Win Condition: Lighting all 5 lanterns triggers game_over won all_lit', ()
   const gameOver = lines.find(l => l.type === 'event' && l.name === 'game_over');
   assert.ok(gameOver, 'game_over event must be emitted');
   assert.equal(gameOver.data.result, 'won');
-  assert.equal(gameOver.data.reason, 'all_lit');
+  assert.equal(gameOver.data.reason, 'dawn_survived');
 
   const endLine = lines[lines.length - 1];
   assert.equal(endLine.type, 'end');
   assert.equal(endLine.state, 'won');
-  assert.ok(endLine.score > 100, 'Score includes bonus for seconds and flames left');
+  // Score: 10 deposited * 5 = 50, + 100 first light L1 = 150.
+  // Dawn bonus: for each lit lantern (4 lanterns: L1, L2, L3, L4), 50 + floor(fuel), plus 3 * 50 for flames left.
+  assert.ok(endLine.score >= 500, 'Score includes base actions and dawn bonus for lit lanterns and flames');
 });
 
 test('Loss Condition: Shade damage reduces flames to 0 triggers game_over lost no_flames', () => {

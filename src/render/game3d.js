@@ -16,6 +16,9 @@ export class Game3D {
     const savedSens = localStorage.getItem('dao_den_long_sens');
     this.mouseSensitivity = savedSens !== null ? parseFloat(savedSens) : 1.0;
 
+    const savedCb = localStorage.getItem('dao_den_long_cb');
+    this.colorblind = savedCb === '1';
+
     this.engine = new IslandEngine({
       seed: Math.floor(Math.random() * 10000),
       night: this.night
@@ -56,6 +59,20 @@ export class Game3D {
   setVolume(val) {
     this.sound.setVolume(val);
     localStorage.setItem('dao_den_long_vol', val.toString());
+  }
+
+  setColorblindMode(enabled) {
+    this.colorblind = Boolean(enabled);
+    localStorage.setItem('dao_den_long_cb', this.colorblind ? '1' : '0');
+    if (this.shadeMat) {
+      if (this.colorblind) {
+        this.shadeMat.color.setHex(0x101528);
+        this.shadeMat.emissive.setHex(0x005588);
+      } else {
+        this.shadeMat.color.setHex(0x120a1a);
+        this.shadeMat.emissive.setHex(0x2d1045);
+      }
+    }
   }
 
   initScene() {
@@ -375,13 +392,33 @@ export class Game3D {
       light.shadow.bias = -0.002;
       g.add(light);
 
+      // Thanh nhiên liệu dầu (Fuel Bar) trên đỉnh đèn (Ticket-03)
+      const fuelBarGroup = new THREE.Group();
+      fuelBarGroup.position.set(0, 3.6, 0);
+
+      const barBgGeo = new THREE.PlaneGeometry(1.2, 0.14);
+      const barBgMat = new THREE.MeshBasicMaterial({ color: 0x1b2350, side: THREE.DoubleSide });
+      const barBg = new THREE.Mesh(barBgGeo, barBgMat);
+      fuelBarGroup.add(barBg);
+
+      const barFillGeo = new THREE.PlaneGeometry(1.16, 0.10);
+      const barFillMat = new THREE.MeshBasicMaterial({ color: 0x55ff88, side: THREE.DoubleSide });
+      const barFill = new THREE.Mesh(barFillGeo, barFillMat);
+      barFill.position.z = 0.01;
+      fuelBarGroup.add(barFill);
+
+      fuelBarGroup.visible = false;
+      g.add(fuelBarGroup);
+
       this.scene.add(g);
       this.lanternMeshes.push({
         id: lanternData.id,
         group: g,
         bulb: bulbMesh,
         halo: haloMesh,
-        light: light
+        light: light,
+        fuelBarGroup: fuelBarGroup,
+        fuelBarFill: barFill
       });
     });
 
@@ -487,8 +524,8 @@ export class Game3D {
     let rawZ = 0;
 
     // Movement relative to camera: W moves forward, S moves back, D right, A left
-    if (this.keys.KeyW || this.keys.ArrowUp) rawZ += 1;
-    if (this.keys.KeyS || this.keys.ArrowDown) rawZ -= 1;
+    if (this.keys.KeyW || this.keys.ArrowUp) rawZ -= 1;
+    if (this.keys.KeyS || this.keys.ArrowDown) rawZ += 1;
     if (this.keys.KeyD || this.keys.ArrowRight) rawX += 1;
     if (this.keys.KeyA || this.keys.ArrowLeft) rawX -= 1;
 
@@ -590,9 +627,9 @@ export class Game3D {
     const pitchRad = (this.camPitchDeg * Math.PI) / 180.0;
     const dist = this.camDistance;
 
-    // Camera sits behind Mây (opposite to yaw direction)
-    const offsetX = -Math.sin(yawRad) * Math.cos(pitchRad) * dist;
-    const offsetZ = -Math.cos(yawRad) * Math.cos(pitchRad) * dist;
+    // Camera sits behind Mây (at +Z when yaw is 0)
+    const offsetX = Math.sin(yawRad) * Math.cos(pitchRad) * dist;
+    const offsetZ = Math.cos(yawRad) * Math.cos(pitchRad) * dist;
     const offsetY = Math.sin(pitchRad) * dist + 1.5;
 
     const targetCamX = this.engine.player.pos[0] + offsetX;
@@ -616,22 +653,51 @@ export class Game3D {
       });
     }
 
-    // 4. Lanterns
+    // 4. Lanterns (Ticket-03: Fuel Bar, 1Hz blink if fuel < 30, deflated 20% if unlit)
     this.engine.lanterns.forEach(lanternData => {
       const found = this.lanternMeshes.find(m => m.id === lanternData.id);
       if (found) {
         if (lanternData.lit) {
-          found.bulb.material.color.setHex(0xffb347);
-          found.bulb.material.emissive.setHex(0xffaa22);
-          found.light.color.setHex(0xffb347);
-          found.light.intensity = 3.6 + Math.sin(time * 0.005 + lanternData.id.charCodeAt(1)) * 0.4;
+          found.group.scale.y = 1.0;
+          found.fuelBarGroup.visible = true;
+          found.fuelBarGroup.quaternion.copy(this.camera.quaternion);
+
+          const fuelRatio = Math.max(0.01, (lanternData.fuel || 0) / 100);
+          found.fuelBarFill.scale.x = fuelRatio;
+          found.fuelBarFill.position.x = -0.58 + 0.58 * fuelRatio;
+
+          if (lanternData.fuel >= 50) {
+            found.fuelBarFill.material.color.setHex(0x55ff88);
+          } else if (lanternData.fuel >= 30) {
+            found.fuelBarFill.material.color.setHex(0xf2c14e);
+          } else {
+            found.fuelBarFill.material.color.setHex(0xff4444);
+          }
+
+          if (lanternData.fuel < 30) {
+            // Nhấp nháy chậm 1 Hz khi fuel < 30
+            const blink = Math.sin(time * 0.00628) > 0;
+            found.bulb.material.color.setHex(blink ? 0xff6622 : 0x5b5f6e);
+            found.bulb.material.emissive.setHex(blink ? 0xff4400 : 0x110500);
+            found.light.intensity = blink ? 2.5 : 0.6;
+            found.fuelBarGroup.visible = blink;
+          } else {
+            found.bulb.material.color.setHex(0xffb347);
+            found.bulb.material.emissive.setHex(0xffaa22);
+            found.light.color.setHex(0xffb347);
+            found.light.intensity = 3.6 + Math.sin(time * 0.005 + lanternData.id.charCodeAt(1)) * 0.4;
+          }
           found.halo.visible = true;
         } else {
-          const ratio = lanternData.deposited / this.engine.tuning.lantern_cost;
+          // Chưa sáng: xẹp 20% theo chiều dọc
+          found.group.scale.y = 0.8;
+          found.fuelBarGroup.visible = false;
+          found.halo.visible = false;
+          const cost = lanternData.ever_lit ? 5 : 10;
+          const ratio = Math.min(1.0, lanternData.deposited / cost);
           found.bulb.material.color.setHex(ratio > 0 ? 0x995511 : 0x5b5f6e);
           found.bulb.material.emissive.setHex(ratio > 0 ? 0x442205 : 0x000000);
           found.light.intensity = 0.2 + ratio * 1.2;
-          found.halo.visible = false;
         }
       }
     });

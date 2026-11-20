@@ -6,7 +6,15 @@ export const DEFAULT_TUNING = {
   dash_duration_s: 0.2,   // 12 ticks
   dash_cooldown_s: 1.5,   // 90 ticks
   carry_capacity: 10,
+  capacity_max: 20,
   lantern_cost: 10,
+  relight_cost: 5,
+  fuel_max: 100,
+  fuel_decay_per_s: 1.0,
+  fuel_per_mote: 10,
+  drain_per_s: 5,
+  low_fuel_threshold: 30,
+  win_ratio: 0.6,
   lantern_count_night1: 5,
   lantern_count_night2: 6,
   lantern_count_night3: 7,
@@ -28,14 +36,16 @@ export const DEFAULT_TUNING = {
   invuln_s: 1.5,          // 90 ticks
   hit_drop_ratio: 0.5,
   fall_enabled: true,
-  night1_duration_s: 300,
-  night2_duration_s: 330,
-  night3_duration_s: 360,
+  night1_duration_s: 240,
+  night2_duration_s: 270,
+  night3_duration_s: 300,
   score: {
-    per_mote: 10,
-    per_lantern: 100,
+    per_mote_deposited: 5,
+    per_first_light: 100,
+    per_relight: 40,
     per_stun: 5,
-    per_second_left: 2,
+    per_stun_drain: 15,
+    per_lit_lantern_base: 50,
     per_flame_left: 50
   }
 };
