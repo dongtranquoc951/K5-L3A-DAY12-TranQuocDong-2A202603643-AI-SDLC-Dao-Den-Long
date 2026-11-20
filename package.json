@@ -1,0 +1,14 @@
+{
+  "name": "dao-den-long",
+  "version": "1.0.0",
+  "description": "3D Game Dao Den Long - AI SDLC Lab",
+  "main": "src/headless.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/headless.js"
+  },
+  "keywords": [],
+  "author": "Tran Quoc Dong",
+  "license": "MIT"
+}
