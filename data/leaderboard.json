@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "name": "Player_B",
+      "score": 950,
+      "nights_won": 3,
+      "achieved_at": "2026-11-20T09:49:44.785Z",
+      "seed": 20
+    },
+    {
+      "name": "Player_C",
+      "score": 500,
+      "nights_won": 2,
+      "achieved_at": "2026-11-20T09:49:44.793Z",
+      "seed": 30
+    },
+    {
+      "name": "Player_A",
+      "score": 300,
+      "nights_won": 2,
+      "achieved_at": "2026-11-20T09:49:44.775Z",
+      "seed": 10
+    }
+  ]
+}

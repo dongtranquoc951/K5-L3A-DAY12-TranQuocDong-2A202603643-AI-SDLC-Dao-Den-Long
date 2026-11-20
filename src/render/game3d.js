@@ -3,6 +3,20 @@ import { SoundFX } from './audio.js';
 
 /* global THREE */
 
+export const DEFAULT_KEY_BINDINGS = {
+  forward: 'KeyW',
+  backward: 'KeyS',
+  left: 'KeyA',
+  right: 'KeyD',
+  jump: 'Space',
+  dash: 'ShiftLeft',
+  pulse: 'KeyQ',
+  interact: 'KeyE',
+  pause: 'Escape',
+  camLeft: 'ArrowLeft',
+  camRight: 'ArrowRight'
+};
+
 export class Game3D {
   constructor(container, night = 1) {
     this.container = container;
@@ -19,17 +33,27 @@ export class Game3D {
     const savedCb = localStorage.getItem('dao_den_long_cb');
     this.colorblind = savedCb === '1';
 
+    const savedMotion = localStorage.getItem('dao_den_long_reduce_motion');
+    this.reduceMotion = savedMotion === '1';
+
+    const savedInvCam = localStorage.getItem('dao_den_long_invert_cam');
+    this.invertCamYaw = savedInvCam === '1';
+
+    // Keybindings
+    this.keyBindings = { ...DEFAULT_KEY_BINDINGS };
+    try {
+      const savedBindings = localStorage.getItem('dao_den_long_keybindings');
+      if (savedBindings) {
+        Object.assign(this.keyBindings, JSON.parse(savedBindings));
+      }
+    } catch (_) {}
+
     this.engine = new IslandEngine({
       seed: Math.floor(Math.random() * 10000),
       night: this.night
     });
 
-    this.keys = {
-      KeyW: false, KeyS: false, KeyA: false, KeyD: false,
-      ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
-      Space: false, KeyE: false, KeyQ: false, KeyF: false,
-      ShiftLeft: false, KeyC: false, Escape: false, KeyP: false
-    };
+    this.keys = {};
 
     // Camera angles
     this.camYawDeg = 0;       // 0 deg looks along +Z
@@ -73,6 +97,58 @@ export class Game3D {
         this.shadeMat.emissive.setHex(0x2d1045);
       }
     }
+  }
+
+  setReduceMotion(enabled) {
+    this.reduceMotion = Boolean(enabled);
+    localStorage.setItem('dao_den_long_reduce_motion', this.reduceMotion ? '1' : '0');
+  }
+
+  setInvertCam(enabled) {
+    this.invertCamYaw = Boolean(enabled);
+    localStorage.setItem('dao_den_long_invert_cam', this.invertCamYaw ? '1' : '0');
+  }
+
+  rotateCam(deg) {
+    const inv = this.invertCamYaw ? -1 : 1;
+    this.camYawDeg += inv * deg;
+  }
+
+  setKeyBinding(action, code) {
+    // Check if code is already used by another action
+    for (const [act, boundCode] of Object.entries(this.keyBindings)) {
+      if (boundCode === code && act !== action) {
+        return { success: false, conflictAction: act };
+      }
+    }
+    this.keyBindings[action] = code;
+    localStorage.setItem('dao_den_long_keybindings', JSON.stringify(this.keyBindings));
+    return { success: true };
+  }
+
+  resetKeyBindings() {
+    this.keyBindings = { ...DEFAULT_KEY_BINDINGS };
+    localStorage.removeItem('dao_den_long_keybindings');
+  }
+
+  isActionActive(action) {
+    const boundCode = this.keyBindings[action];
+    if (boundCode && this.keys[boundCode]) return true;
+
+    // Fallbacks
+    if (action === 'forward' && this.keys['KeyW']) return true;
+    if (action === 'backward' && this.keys['KeyS']) return true;
+    if (action === 'left' && this.keys['KeyA']) return true;
+    if (action === 'right' && this.keys['KeyD']) return true;
+    if (action === 'jump' && this.keys['Space']) return true;
+    if (action === 'dash' && (this.keys['ShiftLeft'] || this.keys['KeyC'])) return true;
+    if (action === 'pulse' && (this.keys['KeyQ'] || this.keys['KeyF'])) return true;
+    if (action === 'interact' && this.keys['KeyE']) return true;
+    if (action === 'pause' && (this.keys['Escape'] || this.keys['KeyP'])) return true;
+    if (action === 'camLeft' && this.keys['ArrowLeft']) return true;
+    if (action === 'camRight' && this.keys['ArrowRight']) return true;
+
+    return false;
   }
 
   initScene() {
@@ -468,16 +544,12 @@ export class Game3D {
 
   bindEvents() {
     window.addEventListener('keydown', e => {
-      if (this.keys.hasOwnProperty(e.code)) {
-        this.keys[e.code] = true;
-        this.sound.init();
-      }
+      this.keys[e.code] = true;
+      this.sound.init();
     });
 
     window.addEventListener('keyup', e => {
-      if (this.keys.hasOwnProperty(e.code)) {
-        this.keys[e.code] = false;
-      }
+      this.keys[e.code] = false;
     });
 
     // Mouse drag controls for smooth 3D camera look
@@ -500,7 +572,7 @@ export class Game3D {
         this.prevMouseY = e.clientY;
 
         // Rotate yaw & pitch
-        this.camYawDeg += deltaX * 0.3 * this.mouseSensitivity;
+        this.rotateCam(deltaX * 0.3 * this.mouseSensitivity);
         this.camPitchDeg = Math.max(8, Math.min(65, this.camPitchDeg - deltaY * 0.2 * this.mouseSensitivity));
       }
     });
@@ -524,16 +596,16 @@ export class Game3D {
     let rawZ = 0;
 
     // Movement relative to camera: W moves forward, S moves back, D right, A left
-    if (this.keys.KeyW || this.keys.ArrowUp) rawZ -= 1;
-    if (this.keys.KeyS || this.keys.ArrowDown) rawZ += 1;
-    if (this.keys.KeyD || this.keys.ArrowRight) rawX += 1;
-    if (this.keys.KeyA || this.keys.ArrowLeft) rawX -= 1;
+    if (this.isActionActive('forward')) rawZ -= 1;
+    if (this.isActionActive('backward')) rawZ += 1;
+    if (this.isActionActive('left')) rawX -= 1;
+    if (this.isActionActive('right')) rawX += 1;
 
-    const jump = Boolean(this.keys.Space);
-    const interact = Boolean(this.keys.KeyE);
-    const pulse = Boolean(this.keys.KeyQ || this.keys.KeyF);
-    const dash = Boolean(this.keys.ShiftLeft || this.keys.KeyC);
-    const pause = Boolean(this.keys.Escape || this.keys.KeyP);
+    const jump = this.isActionActive('jump');
+    const interact = this.isActionActive('interact');
+    const pulse = this.isActionActive('pulse');
+    const dash = this.isActionActive('dash');
+    const pause = this.isActionActive('pause');
 
     return {
       move: [rawX, rawZ],
@@ -547,6 +619,15 @@ export class Game3D {
   }
 
   updateEngine() {
+    // Arrow keys or UI buttons to rotate camera
+    const turnSpeed = 2.2 * this.mouseSensitivity;
+    if (this.isActionActive('camLeft')) {
+      this.rotateCam(turnSpeed);
+    }
+    if (this.isActionActive('camRight')) {
+      this.rotateCam(-turnSpeed);
+    }
+
     const input = this.gatherInput();
     this.engine.setInput(input);
     const events = this.engine.step();
@@ -602,7 +683,7 @@ export class Game3D {
 
     // Subtle breathing / running bob
     const isMoving = Math.hypot(this.engine.player.vel[0], this.engine.player.vel[2]) > 0.1;
-    if (isMoving && this.engine.player.grounded) {
+    if (isMoving && this.engine.player.grounded && !this.reduceMotion) {
       this.playerGroup.position.y += Math.abs(Math.sin(time * 0.015)) * 0.08;
     }
 

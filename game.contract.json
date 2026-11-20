@@ -1,9 +1,11 @@
 {
-  "contract_version": "1.2",
+  "contract_version": "1.3",
   "team": "2A202603643-TranQuocDong",
   "build_cmd": "npm install",
   "run_cmd": "npx serve -l 3000 .",
   "headless_cmd": "node src/headless.js",
+  "bench_cmd": "node src/benchmark.js",
+  "soak_cmd": "node src/soak.js",
   "tuning": {
     "player_speed": 6.0,
     "jump_velocity": 7.0,

@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { IslandEngine } from './core/engine.js';
+import { exportLeaderboard } from './core/leaderboard.js';
 
 function parseArgs(args) {
   const parsed = {
@@ -11,7 +12,8 @@ function parseArgs(args) {
     inputs: null,
     ticks: 120,
     out: null,
-    snapshot_every: 10
+    snapshot_every: 10,
+    export_leaderboard: null
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -30,6 +32,8 @@ function parseArgs(args) {
       parsed.out = args[++i];
     } else if (arg === '--snapshot-every' && i + 1 < args.length) {
       parsed.snapshot_every = parseInt(args[++i], 10);
+    } else if (arg === '--export-leaderboard' && i + 1 < args.length) {
+      parsed.export_leaderboard = args[++i];
     }
   }
 
@@ -38,6 +42,11 @@ function parseArgs(args) {
 
 export function runHeadless(rawArgs) {
   const options = parseArgs(rawArgs);
+
+  if (options.export_leaderboard) {
+    exportLeaderboard(options.export_leaderboard);
+    return;
+  }
 
   if (!options.out) {
     console.error('Error: --out <file.jsonl> is required.');

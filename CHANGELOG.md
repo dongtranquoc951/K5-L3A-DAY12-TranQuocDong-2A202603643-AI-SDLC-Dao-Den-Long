@@ -4,6 +4,31 @@ Toàn bộ các thay đổi qua các phiên bản và Phase phát triển.
 
 ---
 
+## [Phase 4] - 2026-11-20 (Release v1.0.0 — Contract v1.3) - "Bình minh: phát hành v1.0.0"
+
+### ✨ Added (Tính năng mới)
+- **Chế độ Benchmark (`node src/benchmark.js`)**:
+  - Mô phỏng và đo đạc hiệu năng với 200 Bóng Mực, 100 đom đóm, 3 đèn sáng, camera quay vòng tròn 30m ở độ cao 15m.
+  - Xuất tệp `bench.json` chuẩn Test Contract v1.3 (`avg_fps`, `p1_low_fps`, `frame_ms_p95`, `frames`, `load_ms`, `peak_mem_mb`, `vsync_off`).
+- **Soak Test (`node src/soak.js`)**:
+  - Chạy liên tục 10 Đêm trong cùng một tiến trình với các hành động ngẫu nhiên theo seed.
+  - Xuất tệp `soak.json` kiểm soát rò rỉ bộ nhớ (`mem_end_mb <= 1.2 * mem_start_mb`) và tỷ lệ crash 0.
+- **Bảng Xếp Hạng Cục Bộ (Local Leaderboard)**:
+  - Lưu trữ top 10 thành tích trên đĩa (`data/leaderboard.json`) và trình duyệt (`localStorage`).
+  - Cho phép người chơi nhập tên (3-12 ký tự) sau khi chiến thắng hoặc kết thúc đêm.
+  - Hỗ trợ lệnh xuất qua CLI: `node src/headless.js --export-leaderboard out.json`.
+- **Hỗ Trợ Tiếp Cận (Accessibility & Controls)**:
+  - Bổ sung 2 nút xoay camera trái/phải trực quan trên màn hình và điều khiển qua phím mũi tên trái/phải (`ArrowLeft`, `ArrowRight`).
+  - Hỗ trợ đổi phím điều khiển (Key Rebinding) có phát hiện trùng phím và nút khôi phục mặc định.
+  - Tùy chọn đảo ngược trục xoay camera (`invertCamYaw`).
+  - Phụ đề và biểu ngữ cảnh báo hình ảnh: Bóng Mực xuất hiện, Gió lớn nổi lên, 10 giây cuối cùng, Đèn sắp cạn dầu (< 30).
+  - Tùy chọn giảm chuyển động (`reduceMotion`) và cỡ chữ lớn (x1.25).
+- **Hồ Sơ Phát Hành**:
+  - Bổ sung `CREDITS.md`, `LICENSE`, và báo cáo đánh giá hồi cứu `docs/notes/retro-v1.0.0.md`.
+  - Nâng cấp bộ test lên 29 test suites tự động vượt qua 100%.
+
+---
+
 ## [Phase 3] - 2026-11-20 (Contract v1.2) - Change Request "Đèn cạn dầu"
 
 ### ⚠ Breaking Changes (Thay đổi phá vỡ luật cũ)

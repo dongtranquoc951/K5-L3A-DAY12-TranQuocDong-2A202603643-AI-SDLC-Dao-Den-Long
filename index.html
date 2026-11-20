@@ -270,6 +270,138 @@
       width: 150px;
       cursor: pointer;
     }
+    /* Large Font Accessibility Mode */
+    body.large-font {
+      font-size: 1.25rem;
+    }
+    body.large-font .hud-box span,
+    body.large-font .hud-box div,
+    body.large-font .btn,
+    body.large-font .settings-row label {
+      font-size: 1.2em !important;
+    }
+
+    /* Floating Camera Controls */
+    #cam-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(14, 20, 48, 0.88);
+      border: 1px solid rgba(242, 193, 78, 0.4);
+      border-radius: 20px;
+      padding: 6px 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+    }
+    .cam-btn {
+      background: rgba(242, 193, 78, 0.2);
+      border: 1px solid #f2c14e;
+      color: #f2c14e;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .cam-btn:hover {
+      background: #f2c14e;
+      color: #141b3d;
+      transform: scale(1.1);
+    }
+
+    /* Subtitle & Visual Alerts */
+    #subtitle-banner {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(14, 20, 48, 0.92);
+      border: 1px solid #f2c14e;
+      color: #fff6c2;
+      padding: 10px 24px;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: bold;
+      display: none;
+      z-index: 15;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+      animation: alert-glow 1s infinite alternate;
+    }
+    @keyframes alert-glow {
+      from { box-shadow: 0 0 10px rgba(242, 193, 78, 0.4); }
+      to { box-shadow: 0 0 20px rgba(242, 193, 78, 0.8); }
+    }
+
+    /* Key Rebinding Table */
+    .key-bind-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 8px;
+      max-height: 160px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .key-bind-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(14, 20, 48, 0.6);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid #3d4a75;
+      font-size: 12px;
+    }
+    .key-bind-btn {
+      background: #1b2350;
+      color: #f2c14e;
+      border: 1px solid #f2c14e;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .key-bind-btn.waiting {
+      background: #f2c14e;
+      color: #120a1a;
+      animation: pulse-btn 0.8s infinite alternate;
+    }
+    .key-conflict-msg {
+      color: #ff5555;
+      font-size: 12px;
+      margin-top: 6px;
+      display: none;
+    }
+
+    /* Leaderboard Table */
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      text-align: left;
+    }
+    .leaderboard-table th {
+      color: #f2c14e;
+      border-bottom: 2px solid #5b5f6e;
+      padding: 8px;
+    }
+    .leaderboard-table td {
+      padding: 8px;
+      border-bottom: 1px solid rgba(91, 95, 110, 0.3);
+      color: #e8e2d0;
+    }
+    .leaderboard-table tr:hover {
+      background: rgba(242, 193, 78, 0.1);
+    }
   </style>
   <script src="src/render/three.min.js"></script>
 </head>
@@ -316,6 +448,16 @@
     </div>
   </div>
 
+  <!-- Subtitle & Visual Alerts Banner -->
+  <div id="subtitle-banner"></div>
+
+  <!-- On-Screen Camera Rotate Buttons -->
+  <div id="cam-controls">
+    <button id="btn-cam-left" class="cam-btn" title="Xoay Camera Trái (Phím Mũi Tên Trái)">◀</button>
+    <span style="font-size: 11px; color: #f2c14e; font-weight: bold;">Xoay Cam</span>
+    <button id="btn-cam-right" class="cam-btn" title="Xoay Camera Phải (Phím Mũi Tên Phải)">▶</button>
+  </div>
+
   <!-- Cooldowns -->
   <div id="cooldowns">
     <div class="cd-badge" id="cd-dash">Shift (Lướt)<br><span id="cd-dash-val">Sẵn sàng</span></div>
@@ -324,7 +466,7 @@
 
   <!-- Pause Menu Modal -->
   <div class="modal-overlay" id="modal-pause">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 540px;">
       <h2>Tạm Dừng Trò Chơi</h2>
       <p>Hành trình thắp sáng của Mây đang tạm nghỉ trong sương đêm.</p>
 
@@ -338,15 +480,47 @@
           <input type="range" id="sens-slider" min="0.3" max="2.5" step="0.1" value="1.0">
         </div>
         <div class="settings-row">
+          <label for="invert-cam-toggle">Đảo ngược trục xoay camera:</label>
+          <input type="checkbox" id="invert-cam-toggle" style="width: 20px; height: 20px; cursor: pointer;">
+        </div>
+        <div class="settings-row">
           <label for="cb-toggle">Chế độ mù màu (Trợ năng):</label>
           <input type="checkbox" id="cb-toggle" style="width: 20px; height: 20px; cursor: pointer;">
+        </div>
+        <div class="settings-row">
+          <label for="reduce-motion-toggle">Giảm chuyển động (Trợ năng):</label>
+          <input type="checkbox" id="reduce-motion-toggle" style="width: 20px; height: 20px; cursor: pointer;">
+        </div>
+        <div class="settings-row">
+          <label for="large-font-toggle">Cỡ chữ lớn (×1.25 Trợ năng):</label>
+          <input type="checkbox" id="large-font-toggle" style="width: 20px; height: 20px; cursor: pointer;">
+        </div>
+
+        <!-- Key Rebinding Section -->
+        <div style="margin-top: 14px; border-top: 1px solid #3d4a75; padding-top: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; font-weight: bold; color: #f2c14e;">Đổi Phím Điều Khiển:</span>
+            <button id="btn-reset-keys" style="background: none; border: 1px solid #5b5f6e; color: #8fa3b8; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer;">Khôi phục mặc định</button>
+          </div>
+          <div class="key-bind-grid" id="key-bind-container"></div>
+          <div class="key-conflict-msg" id="key-conflict-alert">⚠ Phím này đã được gán cho hành động khác! Vui lòng chọn phím khác.</div>
         </div>
       </div>
 
       <div class="modal-actions">
         <button class="btn" id="btn-resume">Tiếp Tục Chơi (Esc / P)</button>
+        <button class="btn secondary" id="btn-open-leaderboard">Bảng Xếp Hạng</button>
         <button class="btn secondary" id="btn-restart-night">Chơi Lại Đêm Này</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard Modal -->
+  <div class="modal-overlay" id="modal-leaderboard">
+    <div class="modal-card" style="max-width: 600px;">
+      <h2>Bảng Xếp Hạng Đảo Đèn Lồng</h2>
+      <div id="leaderboard-list" style="margin-bottom: 20px; max-height: 280px; overflow-y: auto;"></div>
+      <button class="btn secondary" id="btn-close-leaderboard">Đóng</button>
     </div>
   </div>
 
@@ -364,8 +538,22 @@
     <div class="modal-card">
       <h2 id="result-title">Hoàn Thành Đêm!</h2>
       <p id="result-desc">Tất cả ngọn đèn đã thắp sáng rực rỡ.</p>
-      <div id="result-score" style="font-size: 24px; color: #f2c14e; font-weight: bold; margin-bottom: 20px;">Điểm: 0</div>
-      <button class="btn" id="btn-next-night">Đêm Tiếp Theo</button>
+      <div id="result-score" style="font-size: 24px; color: #f2c14e; font-weight: bold; margin-bottom: 12px;">Điểm: 0</div>
+
+      <!-- Save Score Input Section -->
+      <div id="save-score-section" style="margin-bottom: 18px; background: rgba(14, 20, 48, 0.6); padding: 10px; border-radius: 10px; border: 1px solid #3d4a75;">
+        <div style="font-size: 13px; color: #8fa3b8; margin-bottom: 6px;">Lưu tên vào Bảng Xếp Hạng:</div>
+        <div style="display: flex; gap: 8px; justify-content: center;">
+          <input type="text" id="player-name-input" maxlength="12" placeholder="Tên (3-12 ký tự)" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #f2c14e; background: #1b2350; color: #fff; font-size: 13px; width: 160px;">
+          <button class="btn" id="btn-save-score" style="padding: 6px 14px; font-size: 13px;">Lưu</button>
+        </div>
+        <div id="save-score-msg" style="font-size: 12px; color: #55ff88; margin-top: 6px; display: none;">✔ Đã lưu thành tích!</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" id="btn-next-night">Đêm Tiếp Theo</button>
+        <button class="btn secondary" id="btn-result-leaderboard">Xem Bảng Xếp Hạng</button>
+      </div>
     </div>
   </div>
 
@@ -399,6 +587,27 @@
     const volSlider = document.getElementById('vol-slider');
     const sensSlider = document.getElementById('sens-slider');
     const cbToggle = document.getElementById('cb-toggle');
+    const invertCamToggle = document.getElementById('invert-cam-toggle');
+    const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+    const largeFontToggle = document.getElementById('large-font-toggle');
+    const keyBindContainer = document.getElementById('key-bind-container');
+    const keyConflictAlert = document.getElementById('key-conflict-alert');
+    const btnResetKeys = document.getElementById('btn-reset-keys');
+
+    const btnOpenLeaderboard = document.getElementById('btn-open-leaderboard');
+    const btnResultLeaderboard = document.getElementById('btn-result-leaderboard');
+    const modalLeaderboard = document.getElementById('modal-leaderboard');
+    const btnCloseLeaderboard = document.getElementById('btn-close-leaderboard');
+    const leaderboardList = document.getElementById('leaderboard-list');
+
+    const playerNameInput = document.getElementById('player-name-input');
+    const btnSaveScore = document.getElementById('btn-save-score');
+    const saveScoreMsg = document.getElementById('save-score-msg');
+
+    const btnCamLeft = document.getElementById('btn-cam-left');
+    const btnCamRight = document.getElementById('btn-cam-right');
+    const subtitleBanner = document.getElementById('subtitle-banner');
+
     const elMoteCapacityText = document.getElementById('mote-capacity-text');
     const moteBar = document.getElementById('mote-bar');
 
@@ -413,7 +622,7 @@
     const resultScore = document.getElementById('result-score');
     const btnNextNight = document.getElementById('btn-next-night');
 
-    // Init slider values from storage
+    // Init settings values from storage
     if (localStorage.getItem('dao_den_long_vol')) {
       volSlider.value = localStorage.getItem('dao_den_long_vol');
     }
@@ -435,6 +644,192 @@
     cbToggle.addEventListener('change', e => {
       game.setColorblindMode(e.target.checked);
     });
+
+    if (localStorage.getItem('dao_den_long_invert_cam') === '1') {
+      invertCamToggle.checked = true;
+    }
+    invertCamToggle.addEventListener('change', e => {
+      game.setInvertCam(e.target.checked);
+    });
+
+    if (localStorage.getItem('dao_den_long_reduce_motion') === '1') {
+      reduceMotionToggle.checked = true;
+    }
+    reduceMotionToggle.addEventListener('change', e => {
+      game.setReduceMotion(e.target.checked);
+    });
+
+    if (localStorage.getItem('dao_den_long_large_font') === '1') {
+      largeFontToggle.checked = true;
+      document.body.classList.add('large-font');
+    }
+    largeFontToggle.addEventListener('change', e => {
+      document.body.classList.toggle('large-font', e.target.checked);
+      localStorage.setItem('dao_den_long_large_font', e.target.checked ? '1' : '0');
+    });
+
+    // Camera rotate buttons click and hold
+    let camRotateInterval = null;
+    function startCamRotate(deg) {
+      if (camRotateInterval) clearInterval(camRotateInterval);
+      game.rotateCam(deg);
+      camRotateInterval = setInterval(() => game.rotateCam(deg), 50);
+    }
+    function stopCamRotate() {
+      if (camRotateInterval) {
+        clearInterval(camRotateInterval);
+        camRotateInterval = null;
+      }
+    }
+    btnCamLeft.addEventListener('mousedown', () => startCamRotate(3.0));
+    btnCamLeft.addEventListener('touchstart', e => { e.preventDefault(); startCamRotate(3.0); });
+    btnCamRight.addEventListener('mousedown', () => startCamRotate(-3.0));
+    btnCamRight.addEventListener('touchstart', e => { e.preventDefault(); startCamRotate(-3.0); });
+    window.addEventListener('mouseup', stopCamRotate);
+    window.addEventListener('touchend', stopCamRotate);
+
+    // Key Rebinding UI
+    const ACTION_NAMES = {
+      forward: 'Di chuyển Tới',
+      backward: 'Di chuyển Lùi',
+      left: 'Sang Trái',
+      right: 'Sang Phải',
+      jump: 'Nhảy (Jump)',
+      dash: 'Lướt (Dash)',
+      pulse: 'Tỏa Sáng (Pulse)',
+      interact: 'Nạp/Châm Đèn',
+      pause: 'Tạm Dừng',
+      camLeft: 'Xoay Cam Trái',
+      camRight: 'Xoay Cam Phải'
+    };
+
+    let waitingAction = null;
+    function renderKeyBindings() {
+      keyBindContainer.innerHTML = '';
+      for (const [action, label] of Object.entries(ACTION_NAMES)) {
+        const item = document.createElement('div');
+        item.className = 'key-bind-item';
+        const curKey = game.keyBindings[action] || 'None';
+        item.innerHTML = `
+          <span>${label}:</span>
+          <button class="key-bind-btn" data-action="${action}">${curKey}</button>
+        `;
+        const btn = item.querySelector('.key-bind-btn');
+        btn.addEventListener('click', () => {
+          if (waitingAction) {
+            renderKeyBindings();
+          }
+          waitingAction = action;
+          btn.classList.add('waiting');
+          btn.innerText = 'Nhấn phím...';
+          keyConflictAlert.style.display = 'none';
+        });
+        keyBindContainer.appendChild(item);
+      }
+    }
+
+    window.addEventListener('keydown', e => {
+      if (!waitingAction) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const res = game.setKeyBinding(waitingAction, e.code);
+      if (res.success) {
+        keyConflictAlert.style.display = 'none';
+        waitingAction = null;
+        renderKeyBindings();
+      } else {
+        keyConflictAlert.style.display = 'block';
+        keyConflictAlert.innerText = `⚠ Phím [${e.code}] đã gán cho "${ACTION_NAMES[res.conflictAction]}". Vui lòng chọn phím khác!`;
+      }
+    });
+
+    btnResetKeys.addEventListener('click', () => {
+      game.resetKeyBindings();
+      keyConflictAlert.style.display = 'none';
+      waitingAction = null;
+      renderKeyBindings();
+    });
+    renderKeyBindings();
+
+    // Leaderboard System
+    function getStoredLeaderboard() {
+      try {
+        const raw = localStorage.getItem('dao_den_long_leaderboard');
+        if (raw) return JSON.parse(raw);
+      } catch (_) {}
+      return [];
+    }
+
+    function saveToLeaderboard(entry) {
+      const list = getStoredLeaderboard();
+      list.push(entry);
+      list.sort((a, b) => b.score - a.score || new Date(a.achieved_at) - new Date(b.achieved_at));
+      const top10 = list.slice(0, 10);
+      localStorage.setItem('dao_den_long_leaderboard', JSON.stringify(top10));
+      return top10;
+    }
+
+    function showLeaderboardModal() {
+      const list = getStoredLeaderboard();
+      if (list.length === 0) {
+        leaderboardList.innerHTML = '<p style="color: #8fa3b8; font-style: italic;">Chưa có kỷ lục nào được ghi nhận. Hãy trở thành người đầu tiên!</p>';
+      } else {
+        let html = '<table class="leaderboard-table"><thead><tr><th>Hạng</th><th>Tên</th><th>Điểm</th><th>Đêm thắng</th><th>Thời gian</th></tr></thead><tbody>';
+        list.forEach((item, idx) => {
+          const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `${idx + 1}. `;
+          const dt = new Date(item.achieved_at).toLocaleDateString('vi-VN');
+          html += `<tr><td>${medal}</td><td style="font-weight: bold; color: #fff;">${item.name}</td><td style="color: #f2c14e;">${item.score}</td><td>${item.nights_won}/3</td><td>${dt}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        leaderboardList.innerHTML = html;
+      }
+      modalLeaderboard.style.display = 'flex';
+    }
+
+    btnOpenLeaderboard.addEventListener('click', () => {
+      modalPause.style.display = 'none';
+      showLeaderboardModal();
+    });
+    btnResultLeaderboard.addEventListener('click', showLeaderboardModal);
+    btnCloseLeaderboard.addEventListener('click', () => {
+      modalLeaderboard.style.display = 'none';
+    });
+
+    btnSaveScore.addEventListener('click', () => {
+      let name = playerNameInput.value.trim();
+      if (name.length < 3) name = 'NguoiChoi';
+      if (name.length > 12) name = name.slice(0, 12);
+      const score = totalScore + (game.engine ? game.engine.score : 0);
+      const wonNights = game.engine && game.engine.state === 'won' ? currentNight : currentNight - 1;
+
+      saveToLeaderboard({
+        name: name,
+        score: score,
+        nights_won: Math.max(0, wonNights),
+        achieved_at: new Date().toISOString(),
+        seed: game.engine ? game.engine.seed : 42
+      });
+
+      saveScoreMsg.style.display = 'block';
+      btnSaveScore.disabled = true;
+    });
+
+    // Subtitle trigger helper
+    let subtitleTimeout = null;
+    let prevShadeCount = 0;
+    let prevWindActive = false;
+    let prevSecTotal = -1;
+    const lowFuelAlertedLanterns = new Set();
+
+    function showSubtitle(text, duration = 3000) {
+      subtitleBanner.innerText = text;
+      subtitleBanner.style.display = 'block';
+      if (subtitleTimeout) clearTimeout(subtitleTimeout);
+      subtitleTimeout = setTimeout(() => {
+        subtitleBanner.style.display = 'none';
+      }, duration);
+    }
 
     const nightStories = {
       1: { name: "Đêm 1 — Đảo Bến", text: '"Mây con, hãy thu thập những đốm sáng đom đóm trong đêm sương và thắp lại 5 Đèn Lồng Lớn trên Đảo Bến. Cẩn thận với Bóng Mực!" — Lời Ông Đăng' },
@@ -631,6 +1026,10 @@
       // Game Over / Win sync
       if ((eng.state === 'won' || eng.state === 'lost') && modalResult.style.display !== 'flex') {
         modalResult.style.display = 'flex';
+        saveScoreMsg.style.display = 'none';
+        btnSaveScore.disabled = false;
+        playerNameInput.value = '';
+
         resultScore.innerText = `Điểm Đêm Này: ${eng.score} pts`;
         if (eng.state === 'won') {
           resultTitle.innerText = "Bình Minh Đã Đến!";
@@ -642,6 +1041,31 @@
             ? "Mây đã bị dập tắt hết ngọn lửa sinh mệnh trước sương đen."
             : "Bình minh đã đến nhưng số đèn còn sáng không đủ để xua tan màn sương (< 60%).";
           btnNextNight.innerText = "Chơi Lại Đêm Này";
+        }
+      }
+
+      // Visual Subtitle Alerts (Accessibility)
+      if (eng.shades.length > prevShadeCount && prevShadeCount > 0) {
+        showSubtitle("⚠ Bóng Mực đã xuất hiện trong sương đêm!");
+      }
+      prevShadeCount = eng.shades.length;
+
+      if (eng.wind && eng.wind.active && !prevWindActive) {
+        showSubtitle("🌬 Cảnh báo: Gió lớn đang nổi lên!");
+      }
+      prevWindActive = Boolean(eng.wind && eng.wind.active);
+
+      if (secTotal === 10 && prevSecTotal !== 10) {
+        showSubtitle("⏳ 10 giây cuối cùng tới Bình Minh!");
+      }
+      prevSecTotal = secTotal;
+
+      for (const l of eng.lanterns) {
+        if (l.lit && l.fuel < 30 && !lowFuelAlertedLanterns.has(l.id)) {
+          showSubtitle(`⚠ Cảnh báo: Đèn [${l.id}] sắp cạn dầu (< 30)! Hãy châm dầu!`);
+          lowFuelAlertedLanterns.add(l.id);
+        } else if (l.lit && l.fuel >= 30 && lowFuelAlertedLanterns.has(l.id)) {
+          lowFuelAlertedLanterns.delete(l.id);
         }
       }
     }, 100);
